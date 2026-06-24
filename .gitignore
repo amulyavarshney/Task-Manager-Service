@@ -1,0 +1,42 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Eclipse
+.project
+.classpath
+.settings/
+bin/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Environment / secrets
+.env
+.env.local
+application-local.properties
+application-secrets.properties
+
+# Spring Boot fat jar
+*.jar
+*.war
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*

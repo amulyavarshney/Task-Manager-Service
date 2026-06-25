@@ -1,12 +1,40 @@
 # Task Manager Service
 
-A Spring Boot REST API that creates tasks, persists them in PostgreSQL, and executes them asynchronously on a bounded thread pool. Each task sleeps for a configured duration before being marked complete.
+A Spring Boot REST API + React frontend for creating, managing, and asynchronously executing tasks. Tasks are persisted in PostgreSQL and run on a bounded thread pool; a Vite/React UI lets you manage them in the browser.
+
+## Project Structure
+
+```
+Task-Manager-Service/
+├── src/                     # Spring Boot backend
+│   └── main/java/com/example/taskmanager/
+│       ├── controller/      # REST endpoints
+│       ├── service/         # Business logic & async executor
+│       ├── entity/          # Task JPA entity, TaskStatus enum
+│       ├── repository/      # Spring Data JPA
+│       ├── dto/             # Request/response DTOs
+│       ├── exception/       # RFC 7807 error handling
+│       └── config/          # Thread pool configuration
+├── frontend/                # React + Vite + TypeScript UI
+│   └── src/
+│       ├── api.ts           # Typed API client
+│       ├── types.ts         # Shared TypeScript types
+│       ├── App.tsx          # Main page (task grid, filters, polling)
+│       └── components/      # TaskCard, TaskFormModal, StatusBadge, StatsBar
+├── pom.xml
+└── .env.example
+```
 
 ## Requirements
 
+### Backend
 - Java 17+
 - Maven 3.9+
 - PostgreSQL running on `localhost:5432`
+
+### Frontend
+- Node.js 18+
+- npm 9+
 
 ## Setup
 
@@ -18,25 +46,41 @@ psql -U postgres -c "CREATE DATABASE taskmanager;"
 
 ### 2. Configure credentials
 
-Set environment variables before running (no file edits needed):
-
 ```bash
 export DB_USERNAME=postgres
 export DB_PASSWORD=your_password_here
 # DB_URL defaults to jdbc:postgresql://localhost:5432/taskmanager
 ```
 
-Or copy `.env.example` to `.env` and source it. Hibernate will auto-create the `tasks` table on first startup (`ddl-auto=update`).
+Or copy `.env.example` to `.env` and source it. Hibernate will auto-create the `tasks` table on first startup.
 
-### 3. Run
+### 3. Run the backend
 
 ```bash
 mvn spring-boot:run
+# API available at http://localhost:8080
 ```
 
-The server starts on `http://localhost:8080`.
+### 4. Run the frontend
 
-## API
+```bash
+cd frontend
+npm install
+npm run dev
+# UI available at http://localhost:5173 (proxies /api → :8080)
+```
+
+Open `http://localhost:5173` in your browser to use the app.
+
+## Frontend Features
+
+- **Task grid** — view all tasks with status badges (Ready / In Progress / Done)
+- **Create & edit** — modal form with name and duration inputs
+- **Run tasks** — one-click async execution; UI auto-polls every 2s until completion
+- **Filter & search** — filter by status, search by name
+- **Stats bar** — live counts per status
+
+## API Reference
 
 | Method | Endpoint | Description | Success | Errors |
 |--------|----------|-------------|---------|--------|
@@ -58,25 +102,7 @@ The server starts on `http://localhost:8080`.
 }
 ```
 
-`taskStatus` values: `READY` → `IN_PROGRESS` → `DONE`
-
-### Create a task
-
-```bash
-curl -X POST http://localhost:8080/api/tasks \
-  -H "Content-Type: application/json" \
-  -d '{"taskName": "demo", "taskDuration": 10}'
-```
-
-### Start a task
-
-```bash
-curl -X POST http://localhost:8080/api/tasks/1/start
-# Returns immediately with status IN_PROGRESS
-
-curl http://localhost:8080/api/tasks/1
-# Poll until status is DONE (after ~10 seconds)
-```
+`taskStatus` lifecycle: `READY` → `IN_PROGRESS` → `DONE`
 
 ### Error responses (RFC 7807)
 
@@ -94,19 +120,19 @@ curl http://localhost:8080/api/tasks/1
 |--------|-------|
 | 400 | Blank task name or duration < 1 |
 | 404 | Task ID not found |
-| 409 | Task is already `IN_PROGRESS` or `DONE` |
+| 409 | Task already `IN_PROGRESS` or `DONE` |
 | 503 | Thread pool at capacity (max 4 concurrent tasks) |
 
 ## Configuration
 
-Key properties in `application.properties`:
+Key properties in `src/main/resources/application.properties`:
 
 | Property | Default | Description |
 |----------|---------|-------------|
 | `server.port` | `8080` | HTTP port |
 | `spring.datasource.url` | `jdbc:postgresql://localhost:5432/taskmanager` | DB URL |
-| `task.executor.max-pool-size` | `4` | Max concurrent task threads |
 | `task.executor.core-pool-size` | `2` | Always-alive threads |
+| `task.executor.max-pool-size` | `4` | Max concurrent task threads |
 | `task.executor.queue-capacity` | `10` | Pending task queue depth |
 
 ## Testing
@@ -121,16 +147,6 @@ Tests run against an H2 in-memory database (no PostgreSQL needed). 28 tests acro
 - `TaskControllerTest` — MockMvc slice tests for all endpoints
 - `TaskManagerApplicationTests` — Spring context smoke test
 
-## Architecture
+## License
 
-```
-controller/   ← REST layer, input validation
-service/      ← Business logic, executor management
-  TaskService     CRUD + startTask (sets IN_PROGRESS, submits to pool)
-  TaskRunner      Runs inside the thread pool; sleeps then sets DONE
-repository/   ← Spring Data JPA (PostgreSQL / H2 for tests)
-entity/       ← Task JPA entity, TaskStatus enum
-dto/          ← CreateTaskRequest (validated), TaskResponse
-exception/    ← GlobalExceptionHandler (RFC 7807 ProblemDetail)
-config/       ← ThreadPoolTaskExecutor bean (maxPoolSize=4)
-```
+MIT — see [LICENSE](LICENSE).

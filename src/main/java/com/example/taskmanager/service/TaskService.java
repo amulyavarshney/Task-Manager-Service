@@ -1,12 +1,14 @@
 package com.example.taskmanager.service;
 
 import com.example.taskmanager.dto.CreateTaskRequest;
+import com.example.taskmanager.dto.PagedTaskResponse;
 import com.example.taskmanager.entity.Task;
 import com.example.taskmanager.entity.TaskStatus;
 import com.example.taskmanager.exception.TaskAlreadyRunningException;
 import com.example.taskmanager.exception.TaskNotFoundException;
 import com.example.taskmanager.repository.TaskRepository;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +35,10 @@ public class TaskService {
 
     public List<Task> getAllTasks() {
         return taskRepository.findAll();
+    }
+
+    public PagedTaskResponse getTasksPaged(Pageable pageable) {
+        return new PagedTaskResponse(taskRepository.findAll(pageable));
     }
 
     public Task getTaskById(Long id) {

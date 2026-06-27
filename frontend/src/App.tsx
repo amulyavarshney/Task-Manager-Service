@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Task, TaskStatus, TaskPriority, ExecutorStats, Toast } from './types';
+import type { Task, TaskStatus, TaskPriority, ExecutorStats, Toast, SortField, SortDir } from './types';
 import { api } from './api';
 import { TaskCard } from './components/TaskCard';
 import { TaskFormModal } from './components/TaskFormModal';
@@ -7,6 +7,7 @@ import { StatsBar } from './components/StatsBar';
 import { ToastContainer } from './components/ToastContainer';
 import { ExecutorPanel } from './components/ExecutorPanel';
 import { TaskDetailDrawer } from './components/TaskDetailDrawer';
+import { Pagination } from './components/Pagination';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -18,6 +19,18 @@ const filterOptions: { label: string; value: FilterStatus }[] = [
   { label: 'In Progress', value: 'IN_PROGRESS' },
   { label: 'Done', value: 'DONE' },
   { label: 'Failed', value: 'FAILED' },
+];
+
+const SORT_OPTIONS: { label: string; field: SortField; dir: SortDir }[] = [
+  { label: 'Newest first',  field: 'createdAt',   dir: 'desc' },
+  { label: 'Oldest first',  field: 'createdAt',   dir: 'asc'  },
+  { label: 'Name A→Z',      field: 'taskName',    dir: 'asc'  },
+  { label: 'Name Z→A',      field: 'taskName',    dir: 'desc' },
+  { label: 'Duration ↑',    field: 'taskDuration',dir: 'asc'  },
+  { label: 'Duration ↓',    field: 'taskDuration',dir: 'desc' },
+  { label: 'Priority ↑',    field: 'priority',    dir: 'asc'  },
+  { label: 'Priority ↓',    field: 'priority',    dir: 'desc' },
+  { label: 'Status',        field: 'taskStatus',  dir: 'asc'  },
 ];
 
 let toastSeq = 0;
@@ -35,6 +48,11 @@ export default function App() {
   const [executorStats, setExecutorStats] = useState<ExecutorStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [showExecutor, setShowExecutor] = useState(false);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(12);
+  const [sortIndex, setSortIndex] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function toast(type: Toast['type'], message: string) {
@@ -42,17 +60,24 @@ export default function App() {
     setToasts((prev) => [...prev, { id, type, message }]);
   }
 
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async (opts?: { page?: number; size?: number; sortIdx?: number }) => {
+    const currentSort = SORT_OPTIONS[opts?.sortIdx ?? sortIndex];
     try {
-      const data = await api.listTasks();
-      setTasks(data);
+      const data = await api.listTasks({
+        page: opts?.page ?? page,
+        size: opts?.size ?? pageSize,
+        sort: `${currentSort.field},${currentSort.dir}`,
+      });
+      setTasks(data.content);
+      setTotalPages(data.totalPages);
+      setTotalElements(data.totalElements);
       setError('');
-      // Keep detail drawer in sync
-      setDetailTask((prev) => prev ? data.find((t) => t.taskId === prev.taskId) ?? null : null);
+      setDetailTask((prev) => prev ? data.content.find((t) => t.taskId === prev.taskId) ?? null : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load tasks');
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, sortIndex]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -72,22 +97,35 @@ export default function App() {
   useEffect(() => {
     const hasRunning = tasks.some((t) => t.taskStatus === 'IN_PROGRESS');
     if (hasRunning && !pollingRef.current) {
-      pollingRef.current = setInterval(() => {
-        fetchTasks();
-        fetchStats();
-      }, POLL_INTERVAL_MS);
+      pollingRef.current = setInterval(() => { fetchTasks(); fetchStats(); }, POLL_INTERVAL_MS);
     } else if (!hasRunning && pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
-    return () => {
-      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-    };
+    return () => { if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; } };
   }, [tasks, fetchTasks, fetchStats]);
 
+  function handlePageChange(newPage: number) {
+    setPage(newPage);
+    fetchTasks({ page: newPage });
+  }
+
+  function handlePageSizeChange(newSize: number) {
+    setPage(0);
+    setPageSize(newSize);
+    fetchTasks({ page: 0, size: newSize });
+  }
+
+  function handleSortChange(idx: number) {
+    setSortIndex(idx);
+    setPage(0);
+    fetchTasks({ page: 0, sortIdx: idx });
+  }
+
   async function handleCreate(name: string, duration: number, priority: TaskPriority, tags: string[], maxRetries: number) {
-    const created = await api.createTask({ taskName: name, taskDuration: duration, priority, tags, maxRetries });
-    setTasks((prev) => [created, ...prev]);
+    await api.createTask({ taskName: name, taskDuration: duration, priority, tags, maxRetries });
+    setPage(0);
+    await fetchTasks({ page: 0 });
     toast('success', `Task "${name}" created`);
   }
 
@@ -100,9 +138,9 @@ export default function App() {
   async function handleDelete(id: number) {
     const name = tasks.find((t) => t.taskId === id)?.taskName ?? `#${id}`;
     await api.deleteTask(id);
-    setTasks((prev) => prev.filter((t) => t.taskId !== id));
     setSelected((prev) => { const s = new Set(prev); s.delete(id); return s; });
     if (detailTask?.taskId === id) setDetailTask(null);
+    await fetchTasks();
     toast('info', `Task "${name}" deleted`);
   }
 
@@ -129,8 +167,9 @@ export default function App() {
     for (const id of selected) {
       try { await api.deleteTask(id); ok++; } catch { /* skip */ }
     }
-    await fetchTasks();
     setSelected(new Set());
+    await fetchTasks({ page: 0 });
+    setPage(0);
     toast('info', `Deleted ${ok} task${ok > 1 ? 's' : ''}`);
   }
 
@@ -205,6 +244,7 @@ export default function App() {
           <div className="mb-6">
             <StatsBar
               tasks={tasks}
+              totalElements={totalElements}
               selected={selected}
               onBulkStart={handleBulkStart}
               onBulkDelete={handleBulkDelete}
@@ -242,6 +282,17 @@ export default function App() {
               </button>
             ))}
           </div>
+
+          <select
+            value={sortIndex}
+            onChange={(e) => handleSortChange(Number(e.target.value))}
+            className="border border-slate-200 rounded-lg px-2.5 py-2 text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            title="Sort"
+          >
+            {SORT_OPTIONS.map((opt, i) => (
+              <option key={i} value={i}>{opt.label}</option>
+            ))}
+          </select>
 
           <button
             onClick={() => { fetchTasks(); fetchStats(); }}
@@ -309,7 +360,7 @@ export default function App() {
 
         {/* Task grid */}
         {!loading && filtered.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="task-grid">
             {filtered.map((task) => (
               <div key={task.taskId} className="relative">
                 {/* Checkbox */}
@@ -341,6 +392,18 @@ export default function App() {
               </div>
             ))}
           </div>
+        )}
+
+        {/* Pagination */}
+        {!loading && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalElements={totalElements}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
         )}
       </main>
 

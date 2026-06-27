@@ -1,4 +1,4 @@
-import type { Task, CreateTaskRequest, UpdateTaskRequest, ExecutorStats } from './types';
+import type { Task, CreateTaskRequest, UpdateTaskRequest, ExecutorStats, PagedTaskResponse } from './types';
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -18,7 +18,14 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  listTasks: () => request<Task[]>('/api/tasks'),
+  listTasks: (params?: { page?: number; size?: number; sort?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.page !== undefined) qs.set('page', String(params.page));
+    if (params?.size !== undefined) qs.set('size', String(params.size));
+    if (params?.sort) qs.set('sort', params.sort);
+    const query = qs.toString();
+    return request<PagedTaskResponse>(`/api/tasks${query ? `?${query}` : ''}`);
+  },
   getTask: (id: number) => request<Task>(`/api/tasks/${id}`),
   createTask: (body: CreateTaskRequest) =>
     request<Task>('/api/tasks', { method: 'POST', body: JSON.stringify(body) }),

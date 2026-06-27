@@ -11,12 +11,13 @@ const colors: Record<TaskStatus, string> = {
 
 interface Props {
   tasks: Task[];
+  totalElements: number;
   selected: Set<number>;
   onBulkStart: () => void;
   onBulkDelete: () => void;
 }
 
-export function StatsBar({ tasks, selected, onBulkStart, onBulkDelete }: Props) {
+export function StatsBar({ tasks, totalElements, selected, onBulkStart, onBulkDelete }: Props) {
   const counts = tasks.reduce<Record<TaskStatus, number>>(
     (acc, t) => { acc[t.taskStatus]++; return acc; },
     { READY: 0, IN_PROGRESS: 0, DONE: 0, FAILED: 0 }
@@ -28,7 +29,7 @@ export function StatsBar({ tasks, selected, onBulkStart, onBulkDelete }: Props) 
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex gap-5 flex-wrap">
         <div className="text-sm text-slate-500">
-          <span className="font-semibold text-slate-800 text-lg">{tasks.length}</span>{' '}total
+          <span className="font-semibold text-slate-800 text-lg">{totalElements}</span>{' '}total
         </div>
         {statusOrder.map((s) => (
           <div key={s} className={`text-sm ${colors[s]}`}>

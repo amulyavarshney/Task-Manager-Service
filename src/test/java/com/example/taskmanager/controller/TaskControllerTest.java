@@ -1,7 +1,9 @@
 package com.example.taskmanager.controller;
 
 import com.example.taskmanager.dto.CreateTaskRequest;
+import com.example.taskmanager.dto.PagedTaskResponse;
 import com.example.taskmanager.entity.Task;
+import com.example.taskmanager.entity.TaskPriority;
 import com.example.taskmanager.entity.TaskStatus;
 import com.example.taskmanager.exception.GlobalExceptionHandler;
 import com.example.taskmanager.exception.TaskAlreadyRunningException;
@@ -13,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -36,17 +40,37 @@ class TaskControllerTest {
     // ── GET /api/tasks ────────────────────────────────────────────────────────
 
     @Test
-    void getAllTasks_returns200WithList() throws Exception {
-        when(taskService.getAllTasks()).thenReturn(List.of(
+    void getAllTasks_returns200WithPagedContent() throws Exception {
+        List<Task> tasks = List.of(
             task(1L, "a", 10, TaskStatus.READY),
             task(2L, "b", 20, TaskStatus.DONE)
-        ));
+        );
+        PagedTaskResponse paged = new PagedTaskResponse(
+            new PageImpl<>(tasks, PageRequest.of(0, 20), 2)
+        );
+        when(taskService.getTasksPaged(any())).thenReturn(paged);
 
         mockMvc.perform(get("/api/tasks"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(2))
-            .andExpect(jsonPath("$[0].taskId").value(1))
-            .andExpect(jsonPath("$[1].taskStatus").value("DONE"));
+            .andExpect(jsonPath("$.content.length()").value(2))
+            .andExpect(jsonPath("$.content[0].taskId").value(1))
+            .andExpect(jsonPath("$.content[1].taskStatus").value("DONE"))
+            .andExpect(jsonPath("$.totalElements").value(2))
+            .andExpect(jsonPath("$.totalPages").value(1))
+            .andExpect(jsonPath("$.page").value(0));
+    }
+
+    @Test
+    void getAllTasks_returns200WithEmptyPage_whenNoTasks() throws Exception {
+        PagedTaskResponse empty = new PagedTaskResponse(
+            new PageImpl<>(List.of(), PageRequest.of(0, 20), 0)
+        );
+        when(taskService.getTasksPaged(any())).thenReturn(empty);
+
+        mockMvc.perform(get("/api/tasks?page=0&size=20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(0))
+            .andExpect(jsonPath("$.totalElements").value(0));
     }
 
     // ── GET /api/tasks/{id} ───────────────────────────────────────────────────

@@ -47,3 +47,16 @@ export interface Toast {
   type: 'success' | 'error' | 'info';
   message: string;
 }
+
+export interface PagedTaskResponse {
+  content: Task[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+}
+
+export type SortField = 'createdAt' | 'taskName' | 'taskDuration' | 'priority' | 'taskStatus';
+export type SortDir = 'asc' | 'desc';

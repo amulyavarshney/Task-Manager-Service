@@ -183,7 +183,7 @@ class TaskControllerTest {
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static Task task(Long id, String name, int duration, TaskStatus status) {
-        Task t = new Task(name, duration);
+        Task t = new Task(name, duration, null, null);
         t.setTaskId(id);
         t.setTaskStatus(status);
         return t;

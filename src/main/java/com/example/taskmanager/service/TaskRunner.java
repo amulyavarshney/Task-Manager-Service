@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 @Component
 public class TaskRunner {
 
@@ -37,6 +39,7 @@ public class TaskRunner {
         }
 
         task.setTaskStatus(TaskStatus.DONE);
+        task.setCompletedAt(Instant.now());
         taskRepository.save(task);
         log.info("Task {} completed and marked DONE", taskId);
     }

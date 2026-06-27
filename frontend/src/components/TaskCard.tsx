@@ -7,7 +7,7 @@ import { TaskFormModal } from './TaskFormModal';
 interface Props {
   task: Task;
   onStart: (id: number) => Promise<void>;
-  onUpdate: (id: number, name: string, duration: number, priority: Task['priority'], tags: string[]) => Promise<void>;
+  onUpdate: (id: number, name: string, duration: number, priority: Task['priority'], tags: string[], maxRetries: number) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onViewDetail: (task: Task) => void;
 }
@@ -182,7 +182,7 @@ export function TaskCard({ task, onStart, onUpdate, onDelete, onViewDetail }: Pr
       {editing && (
         <TaskFormModal
           task={task}
-          onSave={(name, duration, priority, tags) => onUpdate(task.taskId, name, duration, priority, tags)}
+          onSave={(name, duration, priority, tags, maxRetries) => onUpdate(task.taskId, name, duration, priority, tags, maxRetries)}
           onClose={() => setEditing(false)}
         />
       )}

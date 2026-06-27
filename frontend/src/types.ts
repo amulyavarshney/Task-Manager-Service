@@ -1,4 +1,4 @@
-export type TaskStatus = 'READY' | 'IN_PROGRESS' | 'DONE';
+export type TaskStatus = 'READY' | 'IN_PROGRESS' | 'DONE' | 'FAILED';
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export interface Task {
@@ -12,6 +12,8 @@ export interface Task {
   startedAt: string | null;
   completedAt: string | null;
   resultMessage: string | null;
+  maxRetries: number;
+  retryCount: number;
 }
 
 export interface CreateTaskRequest {
@@ -19,6 +21,7 @@ export interface CreateTaskRequest {
   taskDuration: number;
   priority?: TaskPriority;
   tags?: string[];
+  maxRetries?: number;
 }
 
 export interface UpdateTaskRequest {
@@ -26,6 +29,7 @@ export interface UpdateTaskRequest {
   taskDuration?: number;
   priority?: TaskPriority;
   tags?: string[];
+  maxRetries?: number;
 }
 
 export interface ExecutorStats {

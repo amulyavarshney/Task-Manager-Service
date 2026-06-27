@@ -11,6 +11,7 @@ export interface Task {
   createdAt: string;
   startedAt: string | null;
   completedAt: string | null;
+  resultMessage: string | null;
 }
 
 export interface CreateTaskRequest {

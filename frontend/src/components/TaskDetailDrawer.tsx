@@ -134,6 +134,20 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
             </div>
           </div>
 
+          {/* Result message */}
+          {task.resultMessage && (
+            <div>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Result</p>
+              <p className={`text-sm rounded-lg px-3 py-2 border ${
+                task.resultMessage.startsWith('Completed')
+                  ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                  : 'bg-slate-50 border-slate-200 text-slate-600'
+              }`}>
+                {task.resultMessage}
+              </p>
+            </div>
+          )}
+
           {/* Config */}
           <div>
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Configuration</p>

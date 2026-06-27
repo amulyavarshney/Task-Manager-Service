@@ -18,6 +18,7 @@ public class TaskResponse {
     private Instant createdAt;
     private Instant startedAt;
     private Instant completedAt;
+    private String resultMessage;
 
     public static TaskResponse from(Task task) {
         TaskResponse r = new TaskResponse();
@@ -30,6 +31,7 @@ public class TaskResponse {
         r.createdAt = task.getCreatedAt();
         r.startedAt = task.getStartedAt();
         r.completedAt = task.getCompletedAt();
+        r.resultMessage = task.getResultMessage();
         return r;
     }
 
@@ -42,4 +44,5 @@ public class TaskResponse {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getStartedAt() { return startedAt; }
     public Instant getCompletedAt() { return completedAt; }
+    public String getResultMessage() { return resultMessage; }
 }

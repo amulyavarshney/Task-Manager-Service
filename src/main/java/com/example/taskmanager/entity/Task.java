@@ -42,6 +42,9 @@ public class Task {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    @Column(name = "result_message", length = 500)
+    private String resultMessage;
+
     public Task() {}
 
     public Task(String taskName, int taskDuration, TaskPriority priority, List<String> tags) {
@@ -79,4 +82,7 @@ public class Task {
 
     public Instant getCompletedAt() { return completedAt; }
     public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
+
+    public String getResultMessage() { return resultMessage; }
+    public void setResultMessage(String resultMessage) { this.resultMessage = resultMessage; }
 }

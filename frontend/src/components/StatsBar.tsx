@@ -3,10 +3,10 @@ import type { Task, TaskStatus } from '../types';
 const statusOrder: TaskStatus[] = ['READY', 'IN_PROGRESS', 'DONE', 'FAILED'];
 const labels: Record<TaskStatus, string> = { READY: 'Ready', IN_PROGRESS: 'In Progress', DONE: 'Done', FAILED: 'Failed' };
 const colors: Record<TaskStatus, string> = {
-  READY: 'text-slate-600',
-  IN_PROGRESS: 'text-blue-600',
-  DONE: 'text-emerald-600',
-  FAILED: 'text-red-600',
+  READY: 'text-slate-600 dark:text-slate-400',
+  IN_PROGRESS: 'text-blue-600 dark:text-blue-400',
+  DONE: 'text-emerald-600 dark:text-emerald-400',
+  FAILED: 'text-red-600 dark:text-red-400',
 };
 
 interface Props {
@@ -28,8 +28,8 @@ export function StatsBar({ tasks, totalElements, selected, onBulkStart, onBulkDe
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex gap-5 flex-wrap">
-        <div className="text-sm text-slate-500">
-          <span className="font-semibold text-slate-800 text-lg">{totalElements}</span>{' '}total
+        <div className="text-sm text-slate-500 dark:text-slate-400">
+          <span className="font-semibold text-slate-800 dark:text-slate-100 text-lg">{totalElements}</span>{' '}total
         </div>
         {statusOrder.map((s) => (
           <div key={s} className={`text-sm ${colors[s]}`}>
@@ -39,12 +39,12 @@ export function StatsBar({ tasks, totalElements, selected, onBulkStart, onBulkDe
       </div>
 
       {selected.size > 0 && (
-        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
-          <span className="text-xs font-medium text-blue-700">{selected.size} selected</span>
+        <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg px-3 py-1.5">
+          <span className="text-xs font-medium text-blue-700 dark:text-blue-300">{selected.size} selected</span>
           {readySelected > 0 && (
             <button
               onClick={onBulkStart}
-              className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
+              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 flex items-center gap-1"
             >
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
               Run {readySelected}
@@ -52,7 +52,7 @@ export function StatsBar({ tasks, totalElements, selected, onBulkStart, onBulkDe
           )}
           <button
             onClick={onBulkDelete}
-            className="text-xs font-medium text-red-500 hover:text-red-700 flex items-center gap-1"
+            className="text-xs font-medium text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-200 flex items-center gap-1"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}

@@ -40,7 +40,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
 
   return (
     <div
-      className={`flex items-center gap-2.5 bg-white border border-slate-200 rounded-xl shadow-lg px-4 py-3 text-sm text-slate-700 max-w-sm transition-all duration-300 ${
+      className={`flex items-center gap-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg px-4 py-3 text-sm text-slate-700 dark:text-slate-200 max-w-sm transition-all duration-300 ${
         visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
       }`}
     >
@@ -48,7 +48,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
       <span className="flex-1">{toast.message}</span>
       <button
         onClick={() => { setVisible(false); setTimeout(onDismiss, 300); }}
-        className="text-slate-400 hover:text-slate-600 transition-colors ml-1"
+        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors ml-1"
       >
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

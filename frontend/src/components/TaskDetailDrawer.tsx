@@ -27,21 +27,21 @@ function elapsed(a: string | null, b: string | null): string {
 
 function ProgressBar({ task }: { task: Task }) {
   if (task.taskStatus !== 'IN_PROGRESS' || !task.startedAt) return null;
-  const elapsed = (Date.now() - new Date(task.startedAt).getTime()) / 1000;
-  const pct = Math.min(100, Math.round((elapsed / task.taskDuration) * 100));
+  const elapsedSec = (Date.now() - new Date(task.startedAt).getTime()) / 1000;
+  const pct = Math.min(100, Math.round((elapsedSec / task.taskDuration) * 100));
   return (
     <div className="mt-4">
-      <div className="flex justify-between text-xs text-slate-500 mb-1.5">
+      <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1.5">
         <span>Progress</span>
         <span>~{pct}%</span>
       </div>
-      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+      <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
         <div
           className="h-full bg-blue-500 rounded-full transition-all duration-1000"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-xs text-slate-400 mt-1">{task.taskDuration}s total duration</p>
+      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{task.taskDuration}s total duration</p>
     </div>
   );
 }
@@ -58,17 +58,14 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
 
   return (
     <div className="fixed inset-0 z-40 flex">
-      <div
-        className="flex-1 bg-black/30 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="w-full max-w-sm bg-white shadow-xl flex flex-col overflow-y-auto">
+      <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="w-full max-w-sm bg-white dark:bg-slate-800 shadow-xl flex flex-col overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 sticky top-0 bg-white z-10">
-          <h2 className="font-semibold text-slate-800">Task Details</h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10">
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100">Task Details</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -79,26 +76,25 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
         <div className="flex-1 px-5 py-5 space-y-5">
           {/* Name & badges */}
           <div>
-            <h3 className="text-lg font-semibold text-slate-800 break-words">{task.taskName}</h3>
-            <p className="text-xs text-slate-400 mb-3">ID #{task.taskId}</p>
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 break-words">{task.taskName}</h3>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-3">ID #{task.taskId}</p>
             <div className="flex flex-wrap gap-2">
               <StatusBadge status={task.taskStatus} />
               <PriorityBadge priority={task.priority} />
             </div>
           </div>
 
-          {/* Progress bar for in-progress tasks */}
           <ProgressBar task={task} />
 
           {/* Tags */}
           {task.tags && task.tags.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Tags</p>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Tags</p>
               <div className="flex flex-wrap gap-1.5">
                 {task.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="px-2.5 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full border border-slate-200"
+                    className="px-2.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs rounded-full border border-slate-200 dark:border-slate-600"
                   >
                     {tag}
                   </span>
@@ -109,39 +105,24 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
 
           {/* Timeline */}
           <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Timeline</p>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Timeline</p>
             <div className="space-y-3">
-              <TimelineRow
-                icon="circle"
-                color="slate"
-                label="Created"
-                value={fmt(task.createdAt)}
-              />
-              <TimelineRow
-                icon="play"
-                color="blue"
-                label="Started"
-                value={fmt(task.startedAt)}
-                sub={task.startedAt ? `Wait: ${waitTime}` : undefined}
-              />
-              <TimelineRow
-                icon="check"
-                color="emerald"
-                label="Completed"
-                value={fmt(task.completedAt)}
-                sub={task.completedAt ? `Run time: ${runTime}` : undefined}
-              />
+              <TimelineRow icon="circle" color="slate" label="Created" value={fmt(task.createdAt)} />
+              <TimelineRow icon="play" color="blue" label="Started" value={fmt(task.startedAt)}
+                sub={task.startedAt ? `Wait: ${waitTime}` : undefined} />
+              <TimelineRow icon="check" color="emerald" label="Completed" value={fmt(task.completedAt)}
+                sub={task.completedAt ? `Run time: ${runTime}` : undefined} />
             </div>
           </div>
 
           {/* Result message */}
           {task.resultMessage && (
             <div>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Result</p>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Result</p>
               <p className={`text-sm rounded-lg px-3 py-2 border ${
                 task.resultMessage.startsWith('Completed')
-                  ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
-                  : 'bg-slate-50 border-slate-200 text-slate-600'
+                  ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-100 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300'
               }`}>
                 {task.resultMessage}
               </p>
@@ -150,22 +131,19 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
 
           {/* Config */}
           <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Configuration</p>
-            <div className="bg-slate-50 rounded-lg border border-slate-200 divide-y divide-slate-200">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Configuration</p>
+            <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600 divide-y divide-slate-200 dark:divide-slate-600">
               <Row label="Duration" value={`${task.taskDuration}s`} />
               <Row label="Priority" value={task.priority ?? 'MEDIUM'} />
               {task.maxRetries > 0 && (
-                <Row
-                  label="Retries"
-                  value={`${task.retryCount} / ${task.maxRetries}`}
-                />
+                <Row label="Retries" value={`${task.retryCount} / ${task.maxRetries}`} />
               )}
             </div>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="px-5 py-4 border-t border-slate-200 flex gap-2 sticky bottom-0 bg-white">
+        <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-700 flex gap-2 sticky bottom-0 bg-white dark:bg-slate-800">
           {task.taskStatus === 'READY' && (
             <button
               onClick={() => onStart(task.taskId)}
@@ -179,7 +157,7 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
           )}
           <button
             onClick={() => onDelete(task.taskId)}
-            className="px-4 py-2 border border-slate-200 text-slate-500 text-sm rounded-lg hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors"
+            className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 text-sm rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 hover:border-red-200 dark:hover:border-red-700 transition-colors"
           >
             Delete
           </button>
@@ -189,9 +167,7 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
   );
 }
 
-function TimelineRow({
-  icon, color, label, value, sub,
-}: {
+function TimelineRow({ icon, color, label, value, sub }: {
   icon: 'circle' | 'play' | 'check';
   color: 'slate' | 'blue' | 'emerald';
   label: string;
@@ -199,18 +175,16 @@ function TimelineRow({
   sub?: string;
 }) {
   const colorMap = {
-    slate: 'bg-slate-200 text-slate-500',
-    blue: 'bg-blue-100 text-blue-500',
-    emerald: 'bg-emerald-100 text-emerald-600',
+    slate: 'bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400',
+    blue: 'bg-blue-100 dark:bg-blue-900/50 text-blue-500 dark:text-blue-400',
+    emerald: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400',
   };
   return (
     <div className="flex items-start gap-3">
       <div className={`w-6 h-6 rounded-full ${colorMap[color]} flex items-center justify-center shrink-0 mt-0.5`}>
         {icon === 'circle' && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
         {icon === 'play' && (
-          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z" />
-          </svg>
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
         )}
         {icon === 'check' && (
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -219,9 +193,9 @@ function TimelineRow({
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-slate-500">{label}</p>
-        <p className="text-sm text-slate-800">{value}</p>
-        {sub && <p className="text-xs text-slate-400">{sub}</p>}
+        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
+        <p className="text-sm text-slate-800 dark:text-slate-200">{value}</p>
+        {sub && <p className="text-xs text-slate-400 dark:text-slate-500">{sub}</p>}
       </div>
     </div>
   );
@@ -230,8 +204,8 @@ function TimelineRow({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between px-3 py-2 text-sm">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-700">{value}</span>
+      <span className="text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="font-medium text-slate-700 dark:text-slate-200">{value}</span>
     </div>
   );
 }

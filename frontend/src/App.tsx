@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Task, TaskStatus, TaskPriority, ExecutorStats, Toast, SortField, SortDir } from './types';
+import { useDarkMode } from './hooks/useDarkMode';
 import { api } from './api';
 import { TaskCard } from './components/TaskCard';
 import { TaskFormModal } from './components/TaskFormModal';
@@ -53,6 +54,7 @@ export default function App() {
   const [sortIndex, setSortIndex] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
+  const [dark, setDark] = useDarkMode();
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function toast(type: Toast['type'], message: string) {
@@ -189,9 +191,9 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -200,17 +202,35 @@ export default function App() {
                   d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
-            <span className="font-semibold text-slate-800">Task Manager</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-100">Task Manager</span>
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDark((d) => !d)}
+              title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              {dark ? (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 5a7 7 0 100 14A7 7 0 0012 5z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
+            </button>
+
             <button
               onClick={() => { setShowExecutor((v) => !v); fetchStats(); }}
               title="Thread pool"
               className={`p-2 border rounded-lg text-sm transition-colors ${
                 showExecutor
-                  ? 'bg-blue-50 border-blue-200 text-blue-600'
-                  : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                  ? 'bg-blue-50 dark:bg-blue-900/40 border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
               }`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -231,7 +251,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 text-slate-800 dark:text-slate-100">
         {/* Executor panel */}
         {showExecutor && (
           <div className="mb-6">
@@ -265,17 +285,17 @@ export default function App() {
               placeholder="Search by name or tag…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
-          <div className="flex gap-1 bg-white border border-slate-200 rounded-lg p-1">
+          <div className="flex gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
             {filterOptions.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => setFilter(opt.value)}
                 className={`px-3 py-1 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-                  filter === opt.value ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-800'
+                  filter === opt.value ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100'
                 }`}
               >
                 {opt.label}
@@ -286,7 +306,7 @@ export default function App() {
           <select
             value={sortIndex}
             onChange={(e) => handleSortChange(Number(e.target.value))}
-            className="border border-slate-200 rounded-lg px-2.5 py-2 text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
             title="Sort"
           >
             {SORT_OPTIONS.map((opt, i) => (
@@ -297,7 +317,7 @@ export default function App() {
           <button
             onClick={() => { fetchTasks(); fetchStats(); }}
             title="Refresh"
-            className="p-2 border border-slate-200 rounded-lg bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors"
+            className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -308,7 +328,7 @@ export default function App() {
 
         {/* Error banner */}
         {error && (
-          <div className="mb-6 flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+          <div className="mb-6 flex items-center gap-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm rounded-lg px-4 py-3">
             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -321,11 +341,11 @@ export default function App() {
         {loading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-xl border border-slate-200 p-5 animate-pulse">
-                <div className="h-4 bg-slate-100 rounded w-3/4 mb-2" />
-                <div className="h-3 bg-slate-100 rounded w-1/4 mb-4" />
-                <div className="h-3 bg-slate-100 rounded w-1/3 mb-5" />
-                <div className="h-8 bg-slate-100 rounded-lg" />
+              <div key={i} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 animate-pulse">
+                <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-3/4 mb-2" />
+                <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded w-1/4 mb-4" />
+                <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded w-1/3 mb-5" />
+                <div className="h-8 bg-slate-100 dark:bg-slate-700 rounded-lg" />
               </div>
             ))}
           </div>
@@ -334,16 +354,16 @@ export default function App() {
         {/* Empty state */}
         {!loading && filtered.length === 0 && (
           <div className="text-center py-20">
-            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                   d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
             {tasks.length === 0 ? (
               <>
-                <p className="text-slate-600 font-medium mb-1">No tasks yet</p>
-                <p className="text-slate-400 text-sm mb-5">Create your first task to get started</p>
+                <p className="text-slate-600 dark:text-slate-300 font-medium mb-1">No tasks yet</p>
+                <p className="text-slate-400 dark:text-slate-500 text-sm mb-5">Create your first task to get started</p>
                 <button onClick={() => setShowCreate(true)}
                   className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
                   Create Task
@@ -351,8 +371,8 @@ export default function App() {
               </>
             ) : (
               <>
-                <p className="text-slate-600 font-medium mb-1">No matching tasks</p>
-                <p className="text-slate-400 text-sm">Try a different search or filter</p>
+                <p className="text-slate-600 dark:text-slate-300 font-medium mb-1">No matching tasks</p>
+                <p className="text-slate-400 dark:text-slate-500 text-sm">Try a different search or filter</p>
               </>
             )}
           </div>
@@ -371,7 +391,7 @@ export default function App() {
                   <div className={`w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer transition-colors ${
                     selected.has(task.taskId)
                       ? 'bg-blue-600 border-blue-600'
-                      : 'border-slate-300 bg-white hover:border-blue-400'
+                      : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-blue-400'
                   }`}>
                     {selected.has(task.taskId) && (
                       <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

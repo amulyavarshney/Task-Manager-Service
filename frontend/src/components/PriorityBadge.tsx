@@ -3,15 +3,15 @@ import type { TaskPriority } from '../types';
 const config: Record<TaskPriority, { label: string; classes: string }> = {
   LOW: {
     label: 'Low',
-    classes: 'bg-slate-100 text-slate-500 border border-slate-200',
+    classes: 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-700 dark:text-slate-400 dark:border-slate-600',
   },
   MEDIUM: {
     label: 'Medium',
-    classes: 'bg-amber-50 text-amber-600 border border-amber-200',
+    classes: 'bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700',
   },
   HIGH: {
     label: 'High',
-    classes: 'bg-red-50 text-red-600 border border-red-200',
+    classes: 'bg-red-50 text-red-600 border border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-700',
   },
 };
 

@@ -46,7 +46,8 @@ public class TaskService {
                 request.getTaskName(),
                 request.getTaskDuration(),
                 request.getPriority(),
-                request.getTags()
+                request.getTags(),
+                request.getMaxRetries()
         );
         return taskRepository.save(task);
     }

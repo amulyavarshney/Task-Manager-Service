@@ -3,7 +3,7 @@ import type { Task, TaskPriority } from '../types';
 
 interface Props {
   task?: Task;
-  onSave: (name: string, duration: number, priority: TaskPriority, tags: string[]) => Promise<void>;
+  onSave: (name: string, duration: number, priority: TaskPriority, tags: string[], maxRetries: number) => Promise<void>;
   onClose: () => void;
 }
 
@@ -21,6 +21,7 @@ export function TaskFormModal({ task, onSave, onClose }: Props) {
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'MEDIUM');
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>(task?.tags ?? []);
+  const [maxRetries, setMaxRetries] = useState(task?.maxRetries ?? 0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -49,7 +50,7 @@ export function TaskFormModal({ task, onSave, onClose }: Props) {
     setSaving(true);
     setError('');
     try {
-      await onSave(name.trim(), duration, priority, tags);
+      await onSave(name.trim(), duration, priority, tags, maxRetries);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save task');
@@ -91,6 +92,19 @@ export function TaskFormModal({ task, onSave, onClose }: Props) {
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <p className="text-xs text-slate-400 mt-1">How many seconds the task will run</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Max Retries</label>
+            <input
+              type="number"
+              min={0}
+              max={10}
+              value={maxRetries}
+              onChange={(e) => setMaxRetries(Math.max(0, Math.min(10, Number(e.target.value))))}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-slate-400 mt-1">How many times to retry on failure (0 = no retries)</p>
           </div>
 
           <div>

@@ -19,6 +19,8 @@ public class TaskResponse {
     private Instant startedAt;
     private Instant completedAt;
     private String resultMessage;
+    private int maxRetries;
+    private int retryCount;
 
     public static TaskResponse from(Task task) {
         TaskResponse r = new TaskResponse();
@@ -32,6 +34,8 @@ public class TaskResponse {
         r.startedAt = task.getStartedAt();
         r.completedAt = task.getCompletedAt();
         r.resultMessage = task.getResultMessage();
+        r.maxRetries = task.getMaxRetries();
+        r.retryCount = task.getRetryCount();
         return r;
     }
 
@@ -45,4 +49,6 @@ public class TaskResponse {
     public Instant getStartedAt() { return startedAt; }
     public Instant getCompletedAt() { return completedAt; }
     public String getResultMessage() { return resultMessage; }
+    public int getMaxRetries() { return maxRetries; }
+    public int getRetryCount() { return retryCount; }
 }

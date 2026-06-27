@@ -45,15 +45,26 @@ public class Task {
     @Column(name = "result_message", length = 500)
     private String resultMessage;
 
+    @Column(name = "max_retries", nullable = false)
+    private int maxRetries = 0;
+
+    @Column(name = "retry_count", nullable = false)
+    private int retryCount = 0;
+
     public Task() {}
 
     public Task(String taskName, int taskDuration, TaskPriority priority, List<String> tags) {
+        this(taskName, taskDuration, priority, tags, 0);
+    }
+
+    public Task(String taskName, int taskDuration, TaskPriority priority, List<String> tags, int maxRetries) {
         this.taskName = taskName;
         this.taskDuration = taskDuration;
         this.taskStatus = TaskStatus.READY;
         this.priority = priority != null ? priority : TaskPriority.MEDIUM;
         this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
         this.createdAt = Instant.now();
+        this.maxRetries = maxRetries;
     }
 
     public Long getTaskId() { return taskId; }
@@ -85,4 +96,10 @@ public class Task {
 
     public String getResultMessage() { return resultMessage; }
     public void setResultMessage(String resultMessage) { this.resultMessage = resultMessage; }
+
+    public int getMaxRetries() { return maxRetries; }
+    public void setMaxRetries(int maxRetries) { this.maxRetries = maxRetries; }
+
+    public int getRetryCount() { return retryCount; }
+    public void setRetryCount(int retryCount) { this.retryCount = retryCount; }
 }

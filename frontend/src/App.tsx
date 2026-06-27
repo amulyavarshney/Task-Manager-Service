@@ -17,6 +17,7 @@ const filterOptions: { label: string; value: FilterStatus }[] = [
   { label: 'Ready', value: 'READY' },
   { label: 'In Progress', value: 'IN_PROGRESS' },
   { label: 'Done', value: 'DONE' },
+  { label: 'Failed', value: 'FAILED' },
 ];
 
 let toastSeq = 0;
@@ -84,14 +85,14 @@ export default function App() {
     };
   }, [tasks, fetchTasks, fetchStats]);
 
-  async function handleCreate(name: string, duration: number, priority: TaskPriority, tags: string[]) {
-    const created = await api.createTask({ taskName: name, taskDuration: duration, priority, tags });
+  async function handleCreate(name: string, duration: number, priority: TaskPriority, tags: string[], maxRetries: number) {
+    const created = await api.createTask({ taskName: name, taskDuration: duration, priority, tags, maxRetries });
     setTasks((prev) => [created, ...prev]);
     toast('success', `Task "${name}" created`);
   }
 
-  async function handleUpdate(id: number, name: string, duration: number, priority: TaskPriority, tags: string[]) {
-    const updated = await api.updateTask(id, { taskName: name, taskDuration: duration, priority, tags });
+  async function handleUpdate(id: number, name: string, duration: number, priority: TaskPriority, tags: string[], maxRetries: number) {
+    const updated = await api.updateTask(id, { taskName: name, taskDuration: duration, priority, tags, maxRetries });
     setTasks((prev) => prev.map((t) => (t.taskId === id ? updated : t)));
     toast('success', `Task "${name}" updated`);
   }
@@ -346,7 +347,7 @@ export default function App() {
       {/* Modals & drawers */}
       {showCreate && (
         <TaskFormModal
-          onSave={handleCreate}
+          onSave={(name, duration, priority, tags, maxRetries) => handleCreate(name, duration, priority, tags, maxRetries)}
           onClose={() => setShowCreate(false)}
         />
       )}

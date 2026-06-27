@@ -154,6 +154,12 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
             <div className="bg-slate-50 rounded-lg border border-slate-200 divide-y divide-slate-200">
               <Row label="Duration" value={`${task.taskDuration}s`} />
               <Row label="Priority" value={task.priority ?? 'MEDIUM'} />
+              {task.maxRetries > 0 && (
+                <Row
+                  label="Retries"
+                  value={`${task.retryCount} / ${task.maxRetries}`}
+                />
+              )}
             </div>
           </div>
         </div>

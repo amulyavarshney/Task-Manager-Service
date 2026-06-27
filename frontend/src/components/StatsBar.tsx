@@ -1,11 +1,12 @@
 import type { Task, TaskStatus } from '../types';
 
-const statusOrder: TaskStatus[] = ['READY', 'IN_PROGRESS', 'DONE'];
-const labels: Record<TaskStatus, string> = { READY: 'Ready', IN_PROGRESS: 'In Progress', DONE: 'Done' };
+const statusOrder: TaskStatus[] = ['READY', 'IN_PROGRESS', 'DONE', 'FAILED'];
+const labels: Record<TaskStatus, string> = { READY: 'Ready', IN_PROGRESS: 'In Progress', DONE: 'Done', FAILED: 'Failed' };
 const colors: Record<TaskStatus, string> = {
   READY: 'text-slate-600',
   IN_PROGRESS: 'text-blue-600',
   DONE: 'text-emerald-600',
+  FAILED: 'text-red-600',
 };
 
 interface Props {
@@ -18,7 +19,7 @@ interface Props {
 export function StatsBar({ tasks, selected, onBulkStart, onBulkDelete }: Props) {
   const counts = tasks.reduce<Record<TaskStatus, number>>(
     (acc, t) => { acc[t.taskStatus]++; return acc; },
-    { READY: 0, IN_PROGRESS: 0, DONE: 0 }
+    { READY: 0, IN_PROGRESS: 0, DONE: 0, FAILED: 0 }
   );
 
   const readySelected = tasks.filter((t) => selected.has(t.taskId) && t.taskStatus === 'READY').length;

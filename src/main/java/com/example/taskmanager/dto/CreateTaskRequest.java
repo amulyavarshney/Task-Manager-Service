@@ -18,6 +18,9 @@ public class CreateTaskRequest {
 
     private List<String> tags;
 
+    @Min(value = 0, message = "max_retries must be >= 0")
+    private int maxRetries = 0;
+
     public String getTaskName() { return taskName; }
     public void setTaskName(String taskName) { this.taskName = taskName; }
 
@@ -29,4 +32,7 @@ public class CreateTaskRequest {
 
     public List<String> getTags() { return tags; }
     public void setTags(List<String> tags) { this.tags = tags; }
+
+    public int getMaxRetries() { return maxRetries; }
+    public void setMaxRetries(int maxRetries) { this.maxRetries = maxRetries; }
 }

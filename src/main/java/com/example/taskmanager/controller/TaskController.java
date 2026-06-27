@@ -9,9 +9,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/tasks")
+@RequestMapping("/api")
 public class TaskController {
 
     private final TaskService taskService;
@@ -20,40 +21,45 @@ public class TaskController {
         this.taskService = taskService;
     }
 
-    @GetMapping
+    @GetMapping("/tasks")
     public ResponseEntity<List<TaskResponse>> getAllTasks() {
         List<TaskResponse> tasks = taskService.getAllTasks()
                 .stream().map(TaskResponse::from).toList();
         return ResponseEntity.ok(tasks);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/tasks/{id}")
     public ResponseEntity<TaskResponse> getTask(@PathVariable Long id) {
         return ResponseEntity.ok(TaskResponse.from(taskService.getTaskById(id)));
     }
 
-    @PostMapping
+    @PostMapping("/tasks")
     public ResponseEntity<TaskResponse> createTask(@Valid @RequestBody CreateTaskRequest request) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(TaskResponse.from(taskService.createTask(request)));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/tasks/{id}")
     public ResponseEntity<TaskResponse> updateTask(
             @PathVariable Long id,
             @Valid @RequestBody CreateTaskRequest request) {
         return ResponseEntity.ok(TaskResponse.from(taskService.updateTask(id, request)));
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/tasks/{id}")
     public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
         taskService.deleteTask(id);
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/{id}/start")
+    @PostMapping("/tasks/{id}/start")
     public ResponseEntity<TaskResponse> startTask(@PathVariable Long id) {
         return ResponseEntity.ok(TaskResponse.from(taskService.startTask(id)));
+    }
+
+    @GetMapping("/executor/stats")
+    public ResponseEntity<Map<String, Object>> getExecutorStats() {
+        return ResponseEntity.ok(taskService.getExecutorStats());
     }
 }

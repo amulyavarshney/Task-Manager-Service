@@ -1,6 +1,4 @@
-import type { Task, CreateTaskRequest, UpdateTaskRequest } from './types';
-
-const BASE = '/api/tasks';
+import type { Task, CreateTaskRequest, UpdateTaskRequest, ExecutorStats } from './types';
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -12,9 +10,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     try {
       const err = await res.json();
       message = err.detail || err.title || err.message || message;
-    } catch {
-      // use default message
-    }
+    } catch { /* use default */ }
     throw new Error(message);
   }
   if (res.status === 204) return undefined as T;
@@ -22,13 +18,13 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  listTasks: () => request<Task[]>(BASE),
-  getTask: (id: number) => request<Task>(`${BASE}/${id}`),
+  listTasks: () => request<Task[]>('/api/tasks'),
+  getTask: (id: number) => request<Task>(`/api/tasks/${id}`),
   createTask: (body: CreateTaskRequest) =>
-    request<Task>(BASE, { method: 'POST', body: JSON.stringify(body) }),
+    request<Task>('/api/tasks', { method: 'POST', body: JSON.stringify(body) }),
   updateTask: (id: number, body: UpdateTaskRequest) =>
-    request<Task>(`${BASE}/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  deleteTask: (id: number) => request<void>(`${BASE}/${id}`, { method: 'DELETE' }),
-  startTask: (id: number) =>
-    request<Task>(`${BASE}/${id}/start`, { method: 'POST' }),
+    request<Task>(`/api/tasks/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteTask: (id: number) => request<void>(`/api/tasks/${id}`, { method: 'DELETE' }),
+  startTask: (id: number) => request<Task>(`/api/tasks/${id}/start`, { method: 'POST' }),
+  getExecutorStats: () => request<ExecutorStats>('/api/executor/stats'),
 };

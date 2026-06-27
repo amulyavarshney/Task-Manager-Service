@@ -1,16 +1,50 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Task } from '../types';
 import { StatusBadge } from './StatusBadge';
+import { PriorityBadge } from './PriorityBadge';
 import { TaskFormModal } from './TaskFormModal';
 
 interface Props {
   task: Task;
   onStart: (id: number) => Promise<void>;
-  onUpdate: (id: number, name: string, duration: number) => Promise<void>;
+  onUpdate: (id: number, name: string, duration: number, priority: Task['priority'], tags: string[]) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
+  onViewDetail: (task: Task) => void;
 }
 
-export function TaskCard({ task, onStart, onUpdate, onDelete }: Props) {
+function ProgressBar({ task }: { task: Task }) {
+  const [pct, setPct] = useState(0);
+
+  useEffect(() => {
+    if (task.taskStatus !== 'IN_PROGRESS' || !task.startedAt) { setPct(0); return; }
+    const update = () => {
+      const elapsed = (Date.now() - new Date(task.startedAt!).getTime()) / 1000;
+      setPct(Math.min(100, Math.round((elapsed / task.taskDuration) * 100)));
+    };
+    update();
+    const t = setInterval(update, 500);
+    return () => clearInterval(t);
+  }, [task]);
+
+  if (task.taskStatus !== 'IN_PROGRESS') return null;
+
+  return (
+    <div className="mt-3 mb-1">
+      <div className="flex justify-between text-xs text-slate-400 mb-1">
+        <span>Running…</span>
+        <span>~{pct}%</span>
+      </div>
+      <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-blue-500 rounded-full transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function TaskCard({ task, onStart, onUpdate, onDelete, onViewDetail }: Props) {
   const [editing, setEditing] = useState(false);
   const [actionError, setActionError] = useState('');
   const [starting, setStarting] = useState(false);
@@ -19,7 +53,8 @@ export function TaskCard({ task, onStart, onUpdate, onDelete }: Props) {
   const canEdit = task.taskStatus === 'READY';
   const canStart = task.taskStatus === 'READY';
 
-  async function handleStart() {
+  async function handleStart(e: React.MouseEvent) {
+    e.stopPropagation();
     setStarting(true);
     setActionError('');
     try {
@@ -31,7 +66,8 @@ export function TaskCard({ task, onStart, onUpdate, onDelete }: Props) {
     }
   }
 
-  async function handleDelete() {
+  async function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation();
     if (!confirm(`Delete "${task.taskName}"?`)) return;
     setDeleting(true);
     setActionError('');
@@ -45,30 +81,51 @@ export function TaskCard({ task, onStart, onUpdate, onDelete }: Props) {
 
   return (
     <>
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow p-5">
-        <div className="flex items-start justify-between gap-3 mb-3">
+      <div
+        className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 transition-all p-5 cursor-pointer group"
+        onClick={() => onViewDetail(task)}
+      >
+        <div className="flex items-start justify-between gap-3 mb-1">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-slate-800 truncate">{task.taskName}</h3>
+            <h3 className="font-semibold text-slate-800 truncate group-hover:text-blue-600 transition-colors">
+              {task.taskName}
+            </h3>
             <p className="text-xs text-slate-400 mt-0.5">ID #{task.taskId}</p>
           </div>
           <StatusBadge status={task.taskStatus} />
         </div>
 
-        <div className="flex items-center gap-1.5 text-sm text-slate-500 mb-4">
-          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex flex-wrap gap-2 mb-3 mt-2">
+          <PriorityBadge priority={task.priority} />
+          {task.tags?.slice(0, 2).map((tag) => (
+            <span key={tag} className="px-2 py-0.5 bg-slate-100 text-slate-500 text-xs rounded-full border border-slate-200">
+              {tag}
+            </span>
+          ))}
+          {(task.tags?.length ?? 0) > 2 && (
+            <span className="px-2 py-0.5 bg-slate-100 text-slate-400 text-xs rounded-full border border-slate-200">
+              +{task.tags.length - 2}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 text-sm text-slate-500">
+          <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
               d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
           </svg>
-          <span>{task.taskDuration}s duration</span>
+          <span>{task.taskDuration}s</span>
         </div>
 
+        <ProgressBar task={task} />
+
         {actionError && (
-          <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5 mb-3">
+          <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1.5 mt-3">
             {actionError}
           </p>
         )}
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-4" onClick={(e) => e.stopPropagation()}>
           {canStart && (
             <button
               onClick={handleStart}
@@ -93,7 +150,7 @@ export function TaskCard({ task, onStart, onUpdate, onDelete }: Props) {
 
           {canEdit && (
             <button
-              onClick={() => setEditing(true)}
+              onClick={(e) => { e.stopPropagation(); setEditing(true); }}
               className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors"
               title="Edit"
             >
@@ -125,7 +182,7 @@ export function TaskCard({ task, onStart, onUpdate, onDelete }: Props) {
       {editing && (
         <TaskFormModal
           task={task}
-          onSave={(name, duration) => onUpdate(task.taskId, name, duration)}
+          onSave={(name, duration, priority, tags) => onUpdate(task.taskId, name, duration, priority, tags)}
           onClose={() => setEditing(false)}
         />
       )}

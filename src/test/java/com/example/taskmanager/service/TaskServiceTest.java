@@ -13,9 +13,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 
 import static org.assertj.core.api.Assertions.*;
@@ -27,7 +28,7 @@ class TaskServiceTest {
 
     @Mock TaskRepository taskRepository;
     @Mock TaskRunner taskRunner;
-    @Mock Executor taskExecutor;
+    @Mock ThreadPoolTaskExecutor taskExecutor;
 
     TaskService taskService;
 
@@ -188,7 +189,7 @@ class TaskServiceTest {
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static Task taskWithId(Long id, String name, int duration, TaskStatus status) {
-        Task t = new Task(name, duration);
+        Task t = new Task(name, duration, null, null);
         t.setTaskId(id);
         t.setTaskStatus(status);
         return t;

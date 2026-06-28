@@ -4,6 +4,7 @@ import com.example.taskmanager.entity.TaskPriority;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 
+import java.time.Instant;
 import java.util.List;
 
 public class CreateTaskRequest {
@@ -35,4 +36,9 @@ public class CreateTaskRequest {
 
     public int getMaxRetries() { return maxRetries; }
     public void setMaxRetries(int maxRetries) { this.maxRetries = maxRetries; }
+
+    private Instant scheduledAt;
+
+    public Instant getScheduledAt() { return scheduledAt; }
+    public void setScheduledAt(Instant scheduledAt) { this.scheduledAt = scheduledAt; }
 }

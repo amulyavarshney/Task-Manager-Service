@@ -21,6 +21,7 @@ public class TaskResponse {
     private String resultMessage;
     private int maxRetries;
     private int retryCount;
+    private Instant scheduledAt;
 
     public static TaskResponse from(Task task) {
         TaskResponse r = new TaskResponse();
@@ -36,6 +37,7 @@ public class TaskResponse {
         r.resultMessage = task.getResultMessage();
         r.maxRetries = task.getMaxRetries();
         r.retryCount = task.getRetryCount();
+        r.scheduledAt = task.getScheduledAt();
         return r;
     }
 
@@ -51,4 +53,5 @@ public class TaskResponse {
     public String getResultMessage() { return resultMessage; }
     public int getMaxRetries() { return maxRetries; }
     public int getRetryCount() { return retryCount; }
+    public Instant getScheduledAt() { return scheduledAt; }
 }

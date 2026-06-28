@@ -13,6 +13,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +23,8 @@ import java.util.concurrent.RejectedExecutionException;
 
 @Service
 public class TaskService {
+
+    private static final Logger log = LoggerFactory.getLogger(TaskService.class);
 
     private final TaskRepository taskRepository;
     private final TaskRunner taskRunner;
@@ -55,6 +60,7 @@ public class TaskService {
                 request.getTags(),
                 request.getMaxRetries()
         );
+        task.setScheduledAt(request.getScheduledAt());
         return taskRepository.save(task);
     }
 
@@ -69,6 +75,7 @@ public class TaskService {
         if (request.getTags() != null) {
             task.setTags(request.getTags());
         }
+        task.setScheduledAt(request.getScheduledAt());
         return taskRepository.save(task);
     }
 
@@ -104,6 +111,20 @@ public class TaskService {
         }
 
         return task;
+    }
+
+    public void startScheduledTasks() {
+        List<Task> due = taskRepository
+                .findByTaskStatusAndScheduledAtIsNotNullAndScheduledAtLessThanEqual(
+                        TaskStatus.READY, Instant.now());
+        for (Task task : due) {
+            try {
+                startTask(task.getTaskId());
+                log.info("Scheduled task {} auto-started", task.getTaskId());
+            } catch (Exception e) {
+                log.warn("Failed to auto-start scheduled task {}: {}", task.getTaskId(), e.getMessage());
+            }
+        }
     }
 
     public Map<String, Object> getExecutorStats() {

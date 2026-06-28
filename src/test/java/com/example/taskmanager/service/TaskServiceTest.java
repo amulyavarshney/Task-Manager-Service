@@ -186,6 +186,32 @@ class TaskServiceTest {
             .contains(TaskStatus.READY);
     }
 
+    // ── startScheduledTasks ───────────────────────────────────────────────────
+
+    @Test
+    void startScheduledTasks_startsReadyTasksWithPastScheduledAt() {
+        Task task = taskWithId(1L, "scheduled", 5, TaskStatus.READY);
+        task.setScheduledAt(java.time.Instant.now().minusSeconds(60));
+        when(taskRepository.findByTaskStatusAndScheduledAtIsNotNullAndScheduledAtLessThanEqual(
+                any(), any())).thenReturn(List.of(task));
+        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(taskRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        taskService.startScheduledTasks();
+
+        verify(taskExecutor).execute(any(Runnable.class));
+    }
+
+    @Test
+    void startScheduledTasks_doesNothing_whenNoDueTasksExist() {
+        when(taskRepository.findByTaskStatusAndScheduledAtIsNotNullAndScheduledAtLessThanEqual(
+                any(), any())).thenReturn(List.of());
+
+        taskService.startScheduledTasks();
+
+        verify(taskExecutor, never()).execute(any());
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static Task taskWithId(Long id, String name, int duration, TaskStatus status) {

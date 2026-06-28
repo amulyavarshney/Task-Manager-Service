@@ -3,7 +3,7 @@ import type { Task, TaskPriority, TaskTemplate } from '../types';
 
 interface Props {
   task?: Task;
-  onSave: (name: string, duration: number, priority: TaskPriority, tags: string[], maxRetries: number) => Promise<void>;
+  onSave: (name: string, duration: number, priority: TaskPriority, tags: string[], maxRetries: number, scheduledAt: string | null) => Promise<void>;
   onClose: () => void;
   templates?: TaskTemplate[];
   onSaveTemplate?: (t: Omit<TaskTemplate, 'id'>) => void;
@@ -21,6 +21,17 @@ const priorityColors: Record<TaskPriority, string> = {
 const inputCls = 'w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
 const labelCls = 'block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1';
 
+function toDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return '';
+  // datetime-local requires "YYYY-MM-DDTHH:mm" format
+  return new Date(iso).toISOString().slice(0, 16);
+}
+
+function fromDatetimeLocal(val: string): string | null {
+  if (!val) return null;
+  return new Date(val).toISOString();
+}
+
 export function TaskFormModal({ task, onSave, onClose, templates, onSaveTemplate, onDeleteTemplate }: Props) {
   const [name, setName] = useState(task?.taskName ?? '');
   const [duration, setDuration] = useState(task?.taskDuration ?? 5);
@@ -28,6 +39,7 @@ export function TaskFormModal({ task, onSave, onClose, templates, onSaveTemplate
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>(task?.tags ?? []);
   const [maxRetries, setMaxRetries] = useState(task?.maxRetries ?? 0);
+  const [scheduledAt, setScheduledAt] = useState<string>(toDatetimeLocal(task?.scheduledAt));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [templateSaved, setTemplateSaved] = useState(false);
@@ -44,6 +56,7 @@ export function TaskFormModal({ task, onSave, onClose, templates, onSaveTemplate
     setPriority(t.priority);
     setTags(t.tags);
     setMaxRetries(t.maxRetries);
+    setScheduledAt('');
   }
 
   function handleSaveTemplate() {
@@ -80,7 +93,7 @@ export function TaskFormModal({ task, onSave, onClose, templates, onSaveTemplate
     setSaving(true);
     setError('');
     try {
-      await onSave(name.trim(), duration, priority, tags, maxRetries);
+      await onSave(name.trim(), duration, priority, tags, maxRetries, fromDatetimeLocal(scheduledAt));
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save task');
@@ -162,6 +175,30 @@ export function TaskFormModal({ task, onSave, onClose, templates, onSaveTemplate
               className={inputCls}
             />
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">How many seconds the task will run</p>
+          </div>
+
+          <div>
+            <label className={labelCls}>Schedule for (optional)</label>
+            <div className="flex gap-2">
+              <input
+                type="datetime-local"
+                value={scheduledAt}
+                min={new Date().toISOString().slice(0, 16)}
+                onChange={(e) => setScheduledAt(e.target.value)}
+                className={`flex-1 ${inputCls}`}
+              />
+              {scheduledAt && (
+                <button
+                  type="button"
+                  onClick={() => setScheduledAt('')}
+                  className="px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 text-sm transition-colors"
+                  title="Clear schedule"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Leave empty to start manually</p>
           </div>
 
           <div>

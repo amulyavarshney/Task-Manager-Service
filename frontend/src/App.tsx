@@ -146,15 +146,15 @@ export default function App() {
     fetchTasks({ page: 0, sortIdx: idx });
   }
 
-  async function handleCreate(name: string, duration: number, priority: TaskPriority, tags: string[], maxRetries: number) {
-    await api.createTask({ taskName: name, taskDuration: duration, priority, tags, maxRetries });
+  async function handleCreate(name: string, duration: number, priority: TaskPriority, tags: string[], maxRetries: number, scheduledAt: string | null) {
+    await api.createTask({ taskName: name, taskDuration: duration, priority, tags, maxRetries, scheduledAt });
     setPage(0);
     await fetchTasks({ page: 0 });
     toast('success', `Task "${name}" created`);
   }
 
-  async function handleUpdate(id: number, name: string, duration: number, priority: TaskPriority, tags: string[], maxRetries: number) {
-    const updated = await api.updateTask(id, { taskName: name, taskDuration: duration, priority, tags, maxRetries });
+  async function handleUpdate(id: number, name: string, duration: number, priority: TaskPriority, tags: string[], maxRetries: number, scheduledAt: string | null) {
+    const updated = await api.updateTask(id, { taskName: name, taskDuration: duration, priority, tags, maxRetries, scheduledAt });
     setTasks((prev) => prev.map((t) => (t.taskId === id ? updated : t)));
     toast('success', `Task "${name}" updated`);
   }
@@ -435,7 +435,7 @@ export default function App() {
                   <TaskCard
                     task={task}
                     onStart={handleStart}
-                    onUpdate={handleUpdate}
+                    onUpdate={(id, name, dur, pri, tags, retries, sched) => handleUpdate(id, name, dur, pri, tags, retries, sched)}
                     onDelete={handleDelete}
                     onViewDetail={setDetailTask}
                   />
@@ -463,7 +463,7 @@ export default function App() {
 
       {showCreate && (
         <TaskFormModal
-          onSave={(name, duration, priority, tags, maxRetries) => handleCreate(name, duration, priority, tags, maxRetries)}
+          onSave={(name, duration, priority, tags, maxRetries, scheduledAt) => handleCreate(name, duration, priority, tags, maxRetries, scheduledAt)}
           onClose={() => setShowCreate(false)}
           templates={templates}
           onSaveTemplate={addTemplate}

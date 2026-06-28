@@ -60,3 +60,13 @@ export interface PagedTaskResponse {
 
 export type SortField = 'createdAt' | 'taskName' | 'taskDuration' | 'priority' | 'taskStatus';
 export type SortDir = 'asc' | 'desc';
+
+export interface TaskTemplate {
+  id: string;
+  name: string;
+  taskName: string;
+  taskDuration: number;
+  priority: TaskPriority;
+  tags: string[];
+  maxRetries: number;
+}

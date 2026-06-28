@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import type { Task, TaskPriority } from '../types';
+import type { Task, TaskPriority, TaskTemplate } from '../types';
 
 interface Props {
   task?: Task;
   onSave: (name: string, duration: number, priority: TaskPriority, tags: string[], maxRetries: number) => Promise<void>;
   onClose: () => void;
+  templates?: TaskTemplate[];
+  onSaveTemplate?: (t: Omit<TaskTemplate, 'id'>) => void;
+  onDeleteTemplate?: (id: string) => void;
 }
 
 const priorities: TaskPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
@@ -18,7 +21,7 @@ const priorityColors: Record<TaskPriority, string> = {
 const inputCls = 'w-full border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-300 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent';
 const labelCls = 'block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1';
 
-export function TaskFormModal({ task, onSave, onClose }: Props) {
+export function TaskFormModal({ task, onSave, onClose, templates, onSaveTemplate, onDeleteTemplate }: Props) {
   const [name, setName] = useState(task?.taskName ?? '');
   const [duration, setDuration] = useState(task?.taskDuration ?? 5);
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'MEDIUM');
@@ -27,12 +30,36 @@ export function TaskFormModal({ task, onSave, onClose }: Props) {
   const [maxRetries, setMaxRetries] = useState(task?.maxRetries ?? 0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [templateSaved, setTemplateSaved] = useState(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
+
+  function applyTemplate(t: TaskTemplate) {
+    setName(t.taskName);
+    setDuration(t.taskDuration);
+    setPriority(t.priority);
+    setTags(t.tags);
+    setMaxRetries(t.maxRetries);
+  }
+
+  function handleSaveTemplate() {
+    if (!onSaveTemplate) return;
+    const templateName = name.trim() || 'Unnamed template';
+    onSaveTemplate({
+      name: templateName,
+      taskName: templateName,
+      taskDuration: duration,
+      priority,
+      tags,
+      maxRetries,
+    });
+    setTemplateSaved(true);
+    setTimeout(() => setTemplateSaved(false), 1500);
+  }
 
   function addTag(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== 'Enter' && e.key !== ',') return;
@@ -62,6 +89,8 @@ export function TaskFormModal({ task, onSave, onClose }: Props) {
     }
   }
 
+  const hasTemplates = (templates?.length ?? 0) > 0;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
@@ -71,6 +100,44 @@ export function TaskFormModal({ task, onSave, onClose }: Props) {
         <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-5">
           {task ? 'Edit Task' : 'New Task'}
         </h2>
+
+        {/* Template quick-fill bar */}
+        {hasTemplates && (
+          <div className="mb-5">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">
+              Templates
+            </p>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+              {templates!.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-1 shrink-0 pl-3 pr-1.5 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-full text-xs text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-600 hover:text-blue-700 dark:hover:text-blue-300 transition-colors group cursor-pointer"
+                >
+                  <button
+                    type="button"
+                    onClick={() => applyTemplate(t)}
+                    className="font-medium"
+                    title={`${t.taskDuration}s · ${t.priority} · ${t.maxRetries} retries`}
+                  >
+                    {t.name}
+                  </button>
+                  {onDeleteTemplate && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteTemplate(t.id)}
+                      className="ml-0.5 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                      title="Remove template"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -137,7 +204,7 @@ export function TaskFormModal({ task, onSave, onClose }: Props) {
                     className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-200 text-xs rounded-full border border-slate-200 dark:border-slate-500"
                   >
                     {tag}
-                    <button type="button" onClick={() => removeTag(tag)} className="text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-100">
+                    <button type="button" onClick={() => removeTag(tag)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-100">
                       <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
@@ -160,6 +227,34 @@ export function TaskFormModal({ task, onSave, onClose }: Props) {
             <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg px-3 py-2">
               {error}
             </p>
+          )}
+
+          {/* Save as template */}
+          {onSaveTemplate && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={handleSaveTemplate}
+                className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                {templateSaved ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-emerald-600 dark:text-emerald-400">Template saved!</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                    </svg>
+                    Save as template
+                  </>
+                )}
+              </button>
+            </div>
           )}
 
           <div className="flex gap-3 pt-1">

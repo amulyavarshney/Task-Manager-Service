@@ -60,6 +60,7 @@ export default function App() {
   const [dark, setDark] = useDarkMode();
   const { templates, addTemplate, removeTemplate } = useTemplates();
   const [showHelp, setShowHelp] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -68,10 +69,12 @@ export default function App() {
     setToasts((prev) => [...prev, { id, type, message }]);
   }
 
-  const fetchTasks = useCallback(async (opts?: { page?: number; size?: number; sortIdx?: number }) => {
+  const fetchTasks = useCallback(async (opts?: { page?: number; size?: number; sortIdx?: number; history?: boolean }) => {
     const currentSort = SORT_OPTIONS[opts?.sortIdx ?? sortIndex];
+    const isHistory = opts?.history ?? showHistory;
+    const fetcher = isHistory ? api.getHistory : api.listTasks;
     try {
-      const data = await api.listTasks({
+      const data = await fetcher({
         page: opts?.page ?? page,
         size: opts?.size ?? pageSize,
         sort: `${currentSort.field},${currentSort.dir}`,
@@ -85,7 +88,7 @@ export default function App() {
       setError(err instanceof Error ? err.message : 'Failed to load tasks');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, sortIndex]);
+  }, [page, pageSize, sortIndex, showHistory]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -119,7 +122,7 @@ export default function App() {
   }, [fetchTasks, fetchStats]);
 
   useEffect(() => {
-    const hasRunning = tasks.some((t) => t.taskStatus === 'IN_PROGRESS');
+    const hasRunning = !showHistory && tasks.some((t) => t.taskStatus === 'IN_PROGRESS');
     if (hasRunning && !pollingRef.current) {
       pollingRef.current = setInterval(() => { fetchTasks(); fetchStats(); }, POLL_INTERVAL_MS);
     } else if (!hasRunning && pollingRef.current) {
@@ -128,6 +131,24 @@ export default function App() {
     }
     return () => { if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; } };
   }, [tasks, fetchTasks, fetchStats]);
+
+  async function handlePurge(id: number) {
+    const name = tasks.find((t) => t.taskId === id)?.taskName ?? `#${id}`;
+    await api.purgeTask(id);
+    setSelected((prev) => { const s = new Set(prev); s.delete(id); return s; });
+    if (detailTask?.taskId === id) setDetailTask(null);
+    await fetchTasks();
+    toast('info', `Task "${name}" permanently deleted`);
+  }
+
+  function handleToggleHistory() {
+    const next = !showHistory;
+    setShowHistory(next);
+    setPage(0);
+    setFilter('ALL');
+    setSearch('');
+    fetchTasks({ page: 0, history: next });
+  }
 
   function handlePageChange(newPage: number) {
     setPage(newPage);
@@ -229,6 +250,21 @@ export default function App() {
 
           <div className="flex items-center gap-2">
             <button
+              onClick={handleToggleHistory}
+              title={showHistory ? 'Back to active tasks' : 'View deleted task history'}
+              className={`p-2 border rounded-lg text-sm transition-colors ${
+                showHistory
+                  ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700 text-amber-600 dark:text-amber-400'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+
+            <button
               onClick={() => setShowHelp((v) => !v)}
               title="Keyboard shortcuts (?)"
               className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium leading-none"
@@ -268,20 +304,35 @@ export default function App() {
                   d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
               </svg>
             </button>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              New Task
-            </button>
+            {!showHistory && (
+              <button
+                onClick={() => setShowCreate(true)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                New Task
+              </button>
+            )}
           </div>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 text-slate-800 dark:text-slate-100">
+        {/* History mode banner */}
+        {showHistory && (
+          <div className="mb-6 flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-300 text-sm rounded-lg px-4 py-3">
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Viewing deleted tasks. Click "Purge" to permanently remove a task.
+            <button onClick={handleToggleHistory} className="ml-auto text-xs underline hover:no-underline">
+              Back to active tasks
+            </button>
+          </div>
+        )}
+
         {/* Executor panel */}
         {showExecutor && (
           <div className="mb-6">
@@ -437,6 +488,7 @@ export default function App() {
                     onStart={handleStart}
                     onUpdate={(id, name, dur, pri, tags, retries, sched) => handleUpdate(id, name, dur, pri, tags, retries, sched)}
                     onDelete={handleDelete}
+                    onPurge={showHistory ? handlePurge : undefined}
                     onViewDetail={setDetailTask}
                   />
                 </div>
@@ -477,6 +529,7 @@ export default function App() {
           onClose={() => setDetailTask(null)}
           onStart={handleStart}
           onDelete={handleDelete}
+          onPurge={showHistory ? handlePurge : undefined}
         />
       )}
 

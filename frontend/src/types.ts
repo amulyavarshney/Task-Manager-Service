@@ -15,6 +15,7 @@ export interface Task {
   maxRetries: number;
   retryCount: number;
   scheduledAt: string | null;
+  deletedAt: string | null;
 }
 
 export interface CreateTaskRequest {

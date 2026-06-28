@@ -204,6 +204,44 @@ class TaskControllerTest {
             .andExpect(jsonPath("$.detail").value("Thread pool is at capacity. Please retry later."));
     }
 
+    // ── GET /api/tasks/history ────────────────────────────────────────────────
+
+    @Test
+    void getHistory_returns200WithDeletedTasks() throws Exception {
+        Task deleted = task(5L, "old", 10, TaskStatus.DONE);
+        deleted.setDeletedAt(java.time.Instant.now());
+        PagedTaskResponse paged = new PagedTaskResponse(
+            new org.springframework.data.domain.PageImpl<>(
+                java.util.List.of(deleted),
+                org.springframework.data.domain.PageRequest.of(0, 20), 1)
+        );
+        when(taskService.getTaskHistory(any())).thenReturn(paged);
+
+        mockMvc.perform(get("/api/tasks/history"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content.length()").value(1))
+            .andExpect(jsonPath("$.content[0].taskId").value(5))
+            .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    // ── DELETE /api/tasks/{id}/purge ──────────────────────────────────────────
+
+    @Test
+    void purgeTask_returns204() throws Exception {
+        doNothing().when(taskService).purgeTask(1L);
+
+        mockMvc.perform(delete("/api/tasks/1/purge"))
+            .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void purgeTask_returns404_whenNotFound() throws Exception {
+        doThrow(new TaskNotFoundException(99L)).when(taskService).purgeTask(99L);
+
+        mockMvc.perform(delete("/api/tasks/99/purge"))
+            .andExpect(status().isNotFound());
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static Task task(Long id, String name, int duration, TaskStatus status) {

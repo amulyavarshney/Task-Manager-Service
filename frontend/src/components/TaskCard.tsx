@@ -7,7 +7,7 @@ import { TaskFormModal } from './TaskFormModal';
 interface Props {
   task: Task;
   onStart: (id: number) => Promise<void>;
-  onUpdate: (id: number, name: string, duration: number, priority: Task['priority'], tags: string[], maxRetries: number) => Promise<void>;
+  onUpdate: (id: number, name: string, duration: number, priority: Task['priority'], tags: string[], maxRetries: number, scheduledAt: string | null) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onViewDetail: (task: Task) => void;
 }
@@ -109,12 +109,23 @@ export function TaskCard({ task, onStart, onUpdate, onDelete, onViewDetail }: Pr
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400">
-          <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
-          </svg>
-          <span>{task.taskDuration}s</span>
+        <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400">
+          <span className="flex items-center gap-1">
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+            </svg>
+            {task.taskDuration}s
+          </span>
+          {task.scheduledAt && task.taskStatus === 'READY' && (
+            <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-full px-2 py-0.5">
+              <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {new Date(task.scheduledAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+            </span>
+          )}
         </div>
 
         <ProgressBar task={task} />
@@ -182,7 +193,7 @@ export function TaskCard({ task, onStart, onUpdate, onDelete, onViewDetail }: Pr
       {editing && (
         <TaskFormModal
           task={task}
-          onSave={(name, duration, priority, tags, maxRetries) => onUpdate(task.taskId, name, duration, priority, tags, maxRetries)}
+          onSave={(name, duration, priority, tags, maxRetries, scheduledAt) => onUpdate(task.taskId, name, duration, priority, tags, maxRetries, scheduledAt)}
           onClose={() => setEditing(false)}
         />
       )}

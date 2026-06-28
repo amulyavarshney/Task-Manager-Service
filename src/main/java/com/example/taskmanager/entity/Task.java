@@ -51,6 +51,9 @@ public class Task {
     @Column(name = "retry_count", nullable = false)
     private int retryCount = 0;
 
+    @Column(name = "scheduled_at")
+    private Instant scheduledAt;
+
     public Task() {}
 
     public Task(String taskName, int taskDuration, TaskPriority priority, List<String> tags) {
@@ -102,4 +105,7 @@ public class Task {
 
     public int getRetryCount() { return retryCount; }
     public void setRetryCount(int retryCount) { this.retryCount = retryCount; }
+
+    public Instant getScheduledAt() { return scheduledAt; }
+    public void setScheduledAt(Instant scheduledAt) { this.scheduledAt = scheduledAt; }
 }

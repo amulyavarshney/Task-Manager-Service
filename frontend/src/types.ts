@@ -14,6 +14,7 @@ export interface Task {
   resultMessage: string | null;
   maxRetries: number;
   retryCount: number;
+  scheduledAt: string | null;
 }
 
 export interface CreateTaskRequest {
@@ -22,6 +23,7 @@ export interface CreateTaskRequest {
   priority?: TaskPriority;
   tags?: string[];
   maxRetries?: number;
+  scheduledAt?: string | null;
 }
 
 export interface UpdateTaskRequest {
@@ -30,6 +32,7 @@ export interface UpdateTaskRequest {
   priority?: TaskPriority;
   tags?: string[];
   maxRetries?: number;
+  scheduledAt?: string | null;
 }
 
 export interface ExecutorStats {

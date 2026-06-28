@@ -56,6 +56,15 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
   const waitTime = elapsed(task.createdAt, task.startedAt);
   const runTime = elapsed(task.startedAt, task.completedAt);
 
+  const scheduledCountdown = (() => {
+    if (!task.scheduledAt || task.taskStatus !== 'READY') return null;
+    const ms = new Date(task.scheduledAt).getTime() - Date.now();
+    if (ms <= 0) return 'Due now';
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    return h > 0 ? `Runs in ${h}h ${m}m` : `Runs in ${m}m`;
+  })();
+
   return (
     <div className="fixed inset-0 z-40 flex">
       <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={onClose} />
@@ -108,6 +117,15 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Timeline</p>
             <div className="space-y-3">
               <TimelineRow icon="circle" color="slate" label="Created" value={fmt(task.createdAt)} />
+              {task.scheduledAt && (
+                <TimelineRow
+                  icon="clock"
+                  color="amber"
+                  label="Scheduled"
+                  value={fmt(task.scheduledAt)}
+                  sub={scheduledCountdown ?? undefined}
+                />
+              )}
               <TimelineRow icon="play" color="blue" label="Started" value={fmt(task.startedAt)}
                 sub={task.startedAt ? `Wait: ${waitTime}` : undefined} />
               <TimelineRow icon="check" color="emerald" label="Completed" value={fmt(task.completedAt)}
@@ -168,8 +186,8 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
 }
 
 function TimelineRow({ icon, color, label, value, sub }: {
-  icon: 'circle' | 'play' | 'check';
-  color: 'slate' | 'blue' | 'emerald';
+  icon: 'circle' | 'play' | 'check' | 'clock';
+  color: 'slate' | 'blue' | 'emerald' | 'amber';
   label: string;
   value: string;
   sub?: string;
@@ -178,11 +196,17 @@ function TimelineRow({ icon, color, label, value, sub }: {
     slate: 'bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400',
     blue: 'bg-blue-100 dark:bg-blue-900/50 text-blue-500 dark:text-blue-400',
     emerald: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400',
+    amber: 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400',
   };
   return (
     <div className="flex items-start gap-3">
       <div className={`w-6 h-6 rounded-full ${colorMap[color]} flex items-center justify-center shrink-0 mt-0.5`}>
         {icon === 'circle' && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+        {icon === 'clock' && (
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )}
         {icon === 'play' && (
           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
         )}

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { Task, TaskStatus, TaskPriority, ExecutorStats, Toast, SortField, SortDir } from './types';
 import { useDarkMode } from './hooks/useDarkMode';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useTemplates } from './hooks/useTemplates';
 import { api } from './api';
 import { TaskCard } from './components/TaskCard';
 import { TaskFormModal } from './components/TaskFormModal';
@@ -57,6 +58,7 @@ export default function App() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [dark, setDark] = useDarkMode();
+  const { templates, addTemplate, removeTemplate } = useTemplates();
   const [showHelp, setShowHelp] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -463,6 +465,9 @@ export default function App() {
         <TaskFormModal
           onSave={(name, duration, priority, tags, maxRetries) => handleCreate(name, duration, priority, tags, maxRetries)}
           onClose={() => setShowCreate(false)}
+          templates={templates}
+          onSaveTemplate={addTemplate}
+          onDeleteTemplate={removeTemplate}
         />
       )}
 

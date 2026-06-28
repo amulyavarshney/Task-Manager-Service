@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { Task, TaskStatus, TaskPriority, ExecutorStats, Toast, SortField, SortDir } from './types';
 import { useDarkMode } from './hooks/useDarkMode';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { api } from './api';
 import { TaskCard } from './components/TaskCard';
 import { TaskFormModal } from './components/TaskFormModal';
@@ -9,6 +10,7 @@ import { ToastContainer } from './components/ToastContainer';
 import { ExecutorPanel } from './components/ExecutorPanel';
 import { TaskDetailDrawer } from './components/TaskDetailDrawer';
 import { Pagination } from './components/Pagination';
+import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -55,6 +57,8 @@ export default function App() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [dark, setDark] = useDarkMode();
+  const [showHelp, setShowHelp] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function toast(type: Toast['type'], message: string) {
@@ -91,6 +95,22 @@ export default function App() {
       setStatsLoading(false);
     }
   }, []);
+
+  const shortcuts = useMemo(() => ({
+    onNew: () => { if (!showCreate && !detailTask && !showHelp) setShowCreate(true); },
+    onFocusSearch: () => searchRef.current?.focus(),
+    onRefresh: () => { fetchTasks(); fetchStats(); },
+    onEscape: () => {
+      if (showHelp) { setShowHelp(false); return; }
+      if (showCreate) { setShowCreate(false); return; }
+      if (detailTask) { setDetailTask(null); return; }
+      if (selected.size > 0) setSelected(new Set());
+    },
+    onToggleDark: () => setDark((d) => !d),
+    onHelp: () => setShowHelp((v) => !v),
+  }), [showCreate, detailTask, showHelp, selected, fetchTasks, fetchStats, setDark]);
+
+  useKeyboardShortcuts(shortcuts);
 
   useEffect(() => {
     Promise.all([fetchTasks(), fetchStats()]).finally(() => setLoading(false));
@@ -207,6 +227,14 @@ export default function App() {
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowHelp((v) => !v)}
+              title="Keyboard shortcuts (?)"
+              className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium leading-none"
+            >
+              ?
+            </button>
+
+            <button
               onClick={() => setDark((d) => !d)}
               title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
               className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
@@ -285,6 +313,7 @@ export default function App() {
               placeholder="Search by name or tag…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              ref={searchRef}
               className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -428,6 +457,8 @@ export default function App() {
       </main>
 
       {/* Modals & drawers */}
+      {showHelp && <KeyboardShortcutsHelp onClose={() => setShowHelp(false)} />}
+
       {showCreate && (
         <TaskFormModal
           onSave={(name, duration, priority, tags, maxRetries) => handleCreate(name, duration, priority, tags, maxRetries)}

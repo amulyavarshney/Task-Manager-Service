@@ -22,6 +22,7 @@ public class TaskResponse {
     private int maxRetries;
     private int retryCount;
     private Instant scheduledAt;
+    private Instant deletedAt;
 
     public static TaskResponse from(Task task) {
         TaskResponse r = new TaskResponse();
@@ -38,6 +39,7 @@ public class TaskResponse {
         r.maxRetries = task.getMaxRetries();
         r.retryCount = task.getRetryCount();
         r.scheduledAt = task.getScheduledAt();
+        r.deletedAt = task.getDeletedAt();
         return r;
     }
 
@@ -54,4 +56,5 @@ public class TaskResponse {
     public int getMaxRetries() { return maxRetries; }
     public int getRetryCount() { return retryCount; }
     public Instant getScheduledAt() { return scheduledAt; }
+    public Instant getDeletedAt() { return deletedAt; }
 }

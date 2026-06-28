@@ -60,6 +60,18 @@ public class TaskController {
         return ResponseEntity.ok(TaskResponse.from(taskService.startTask(id)));
     }
 
+    @GetMapping("/tasks/history")
+    public ResponseEntity<PagedTaskResponse> getTaskHistory(
+            @PageableDefault(size = 20, sort = "deletedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(taskService.getTaskHistory(pageable));
+    }
+
+    @DeleteMapping("/tasks/{id}/purge")
+    public ResponseEntity<Void> purgeTask(@PathVariable Long id) {
+        taskService.purgeTask(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/executor/stats")
     public ResponseEntity<Map<String, Object>> getExecutorStats() {
         return ResponseEntity.ok(taskService.getExecutorStats());

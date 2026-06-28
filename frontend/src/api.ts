@@ -32,6 +32,15 @@ export const api = {
   updateTask: (id: number, body: UpdateTaskRequest) =>
     request<Task>(`/api/tasks/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteTask: (id: number) => request<void>(`/api/tasks/${id}`, { method: 'DELETE' }),
+  purgeTask: (id: number) => request<void>(`/api/tasks/${id}/purge`, { method: 'DELETE' }),
   startTask: (id: number) => request<Task>(`/api/tasks/${id}/start`, { method: 'POST' }),
   getExecutorStats: () => request<ExecutorStats>('/api/executor/stats'),
+  getHistory: (params?: { page?: number; size?: number; sort?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.page !== undefined) qs.set('page', String(params.page));
+    if (params?.size !== undefined) qs.set('size', String(params.size));
+    if (params?.sort) qs.set('sort', params.sort);
+    const query = qs.toString();
+    return request<PagedTaskResponse>(`/api/tasks/history${query ? `?${query}` : ''}`);
+  },
 };

@@ -8,6 +8,7 @@ interface Props {
   onClose: () => void;
   onStart: (id: number) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
+  onPurge?: (id: number) => Promise<void>;
 }
 
 function fmt(iso: string | null): string {
@@ -46,7 +47,7 @@ function ProgressBar({ task }: { task: Task }) {
   );
 }
 
-export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
+export function TaskDetailDrawer({ task, onClose, onStart, onDelete, onPurge }: Props) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
@@ -130,6 +131,9 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
                 sub={task.startedAt ? `Wait: ${waitTime}` : undefined} />
               <TimelineRow icon="check" color="emerald" label="Completed" value={fmt(task.completedAt)}
                 sub={task.completedAt ? `Run time: ${runTime}` : undefined} />
+              {task.deletedAt && (
+                <TimelineRow icon="trash" color="red" label="Deleted" value={fmt(task.deletedAt)} />
+              )}
             </div>
           </div>
 
@@ -162,7 +166,7 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
 
         {/* Actions */}
         <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-700 flex gap-2 sticky bottom-0 bg-white dark:bg-slate-800">
-          {task.taskStatus === 'READY' && (
+          {!task.deletedAt && task.taskStatus === 'READY' && (
             <button
               onClick={() => onStart(task.taskId)}
               className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
@@ -173,12 +177,22 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
               Run Task
             </button>
           )}
-          <button
-            onClick={() => onDelete(task.taskId)}
-            className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 text-sm rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 hover:border-red-200 dark:hover:border-red-700 transition-colors"
-          >
-            Delete
-          </button>
+          {!task.deletedAt && (
+            <button
+              onClick={() => onDelete(task.taskId)}
+              className="px-4 py-2 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 text-sm rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-500 hover:border-red-200 dark:hover:border-red-700 transition-colors"
+            >
+              Delete
+            </button>
+          )}
+          {task.deletedAt && onPurge && (
+            <button
+              onClick={() => onPurge(task.taskId)}
+              className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Purge permanently
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -186,8 +200,8 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete }: Props) {
 }
 
 function TimelineRow({ icon, color, label, value, sub }: {
-  icon: 'circle' | 'play' | 'check' | 'clock';
-  color: 'slate' | 'blue' | 'emerald' | 'amber';
+  icon: 'circle' | 'play' | 'check' | 'clock' | 'trash';
+  color: 'slate' | 'blue' | 'emerald' | 'amber' | 'red';
   label: string;
   value: string;
   sub?: string;
@@ -197,6 +211,7 @@ function TimelineRow({ icon, color, label, value, sub }: {
     blue: 'bg-blue-100 dark:bg-blue-900/50 text-blue-500 dark:text-blue-400',
     emerald: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400',
     amber: 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400',
+    red: 'bg-red-100 dark:bg-red-900/50 text-red-500 dark:text-red-400',
   };
   return (
     <div className="flex items-start gap-3">
@@ -205,6 +220,12 @@ function TimelineRow({ icon, color, label, value, sub }: {
         {icon === 'clock' && (
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )}
+        {icon === 'trash' && (
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
         )}
         {icon === 'play' && (

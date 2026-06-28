@@ -39,15 +39,19 @@ public class TaskService {
     }
 
     public List<Task> getAllTasks() {
-        return taskRepository.findAll();
+        return taskRepository.findByDeletedAtIsNull();
     }
 
     public PagedTaskResponse getTasksPaged(Pageable pageable) {
-        return new PagedTaskResponse(taskRepository.findAll(pageable));
+        return new PagedTaskResponse(taskRepository.findByDeletedAtIsNull(pageable));
+    }
+
+    public PagedTaskResponse getTaskHistory(Pageable pageable) {
+        return new PagedTaskResponse(taskRepository.findByDeletedAtIsNotNull(pageable));
     }
 
     public Task getTaskById(Long id) {
-        return taskRepository.findById(id)
+        return taskRepository.findByTaskIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new TaskNotFoundException(id));
     }
 
@@ -81,6 +85,14 @@ public class TaskService {
 
     @Transactional
     public void deleteTask(Long id) {
+        Task task = taskRepository.findByTaskIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new TaskNotFoundException(id));
+        task.setDeletedAt(Instant.now());
+        taskRepository.save(task);
+    }
+
+    @Transactional
+    public void purgeTask(Long id) {
         if (!taskRepository.existsById(id)) {
             throw new TaskNotFoundException(id);
         }
@@ -116,7 +128,8 @@ public class TaskService {
     public void startScheduledTasks() {
         List<Task> due = taskRepository
                 .findByTaskStatusAndScheduledAtIsNotNullAndScheduledAtLessThanEqual(
-                        TaskStatus.READY, Instant.now());
+                        TaskStatus.READY, Instant.now())
+                .stream().filter(t -> t.getDeletedAt() == null).toList();
         for (Task task : due) {
             try {
                 startTask(task.getTaskId());

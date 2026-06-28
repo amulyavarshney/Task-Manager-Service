@@ -61,7 +61,7 @@ class TaskServiceTest {
             taskWithId(1L, "a", 10, TaskStatus.READY),
             taskWithId(2L, "b", 20, TaskStatus.DONE)
         );
-        when(taskRepository.findAll()).thenReturn(tasks);
+        when(taskRepository.findByDeletedAtIsNull()).thenReturn(tasks);
 
         assertThat(taskService.getAllTasks()).hasSize(2);
     }
@@ -71,14 +71,14 @@ class TaskServiceTest {
     @Test
     void getTaskById_returnsTask_whenFound() {
         Task task = taskWithId(1L, "x", 5, TaskStatus.READY);
-        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(task));
 
         assertThat(taskService.getTaskById(1L).getTaskId()).isEqualTo(1L);
     }
 
     @Test
     void getTaskById_throwsTaskNotFoundException_whenMissing() {
-        when(taskRepository.findById(99L)).thenReturn(Optional.empty());
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> taskService.getTaskById(99L))
             .isInstanceOf(TaskNotFoundException.class)
@@ -90,7 +90,7 @@ class TaskServiceTest {
     @Test
     void updateTask_updatesFieldsAndSaves() {
         Task existing = taskWithId(1L, "old", 10, TaskStatus.READY);
-        when(taskRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(existing));
         when(taskRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Task result = taskService.updateTask(1L, request("new", 99));
@@ -101,30 +101,54 @@ class TaskServiceTest {
 
     @Test
     void updateTask_throwsTaskNotFoundException_whenMissing() {
-        when(taskRepository.findById(5L)).thenReturn(Optional.empty());
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(5L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> taskService.updateTask(5L, request("x", 1)))
             .isInstanceOf(TaskNotFoundException.class);
     }
 
-    // ── deleteTask ────────────────────────────────────────────────────────────
+    // ── deleteTask (soft delete) ──────────────────────────────────────────────
 
     @Test
-    void deleteTask_deletesWhenExists() {
-        when(taskRepository.existsById(1L)).thenReturn(true);
+    void deleteTask_softDeletesSetsDeletedAt() {
+        Task task = taskWithId(1L, "t", 5, TaskStatus.READY);
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(task));
+        when(taskRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         taskService.deleteTask(1L);
+
+        ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
+        verify(taskRepository).save(captor.capture());
+        assertThat(captor.getValue().getDeletedAt()).isNotNull();
+        verify(taskRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void deleteTask_throwsTaskNotFoundException_whenMissing() {
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(7L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> taskService.deleteTask(7L))
+            .isInstanceOf(TaskNotFoundException.class);
+        verify(taskRepository, never()).deleteById(any());
+    }
+
+    // ── purgeTask (hard delete) ───────────────────────────────────────────────
+
+    @Test
+    void purgeTask_hardDeletesTask() {
+        when(taskRepository.existsById(1L)).thenReturn(true);
+
+        taskService.purgeTask(1L);
 
         verify(taskRepository).deleteById(1L);
     }
 
     @Test
-    void deleteTask_throwsTaskNotFoundException_whenMissing() {
-        when(taskRepository.existsById(7L)).thenReturn(false);
+    void purgeTask_throwsTaskNotFoundException_whenMissing() {
+        when(taskRepository.existsById(9L)).thenReturn(false);
 
-        assertThatThrownBy(() -> taskService.deleteTask(7L))
+        assertThatThrownBy(() -> taskService.purgeTask(9L))
             .isInstanceOf(TaskNotFoundException.class);
-        verify(taskRepository, never()).deleteById(any());
     }
 
     // ── startTask ─────────────────────────────────────────────────────────────
@@ -132,7 +156,7 @@ class TaskServiceTest {
     @Test
     void startTask_setsInProgressAndSubmitsToExecutor() {
         Task task = taskWithId(1L, "run", 5, TaskStatus.READY);
-        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(task));
         when(taskRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Task result = taskService.startTask(1L);
@@ -144,7 +168,7 @@ class TaskServiceTest {
     @Test
     void startTask_throwsTaskAlreadyRunningException_whenInProgress() {
         Task task = taskWithId(1L, "run", 5, TaskStatus.IN_PROGRESS);
-        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(task));
 
         assertThatThrownBy(() -> taskService.startTask(1L))
             .isInstanceOf(TaskAlreadyRunningException.class);
@@ -154,7 +178,7 @@ class TaskServiceTest {
     @Test
     void startTask_throwsTaskAlreadyRunningException_whenDone() {
         Task task = taskWithId(1L, "run", 5, TaskStatus.DONE);
-        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(task));
 
         assertThatThrownBy(() -> taskService.startTask(1L))
             .isInstanceOf(TaskAlreadyRunningException.class);
@@ -162,7 +186,7 @@ class TaskServiceTest {
 
     @Test
     void startTask_throwsTaskNotFoundException_whenMissing() {
-        when(taskRepository.findById(42L)).thenReturn(Optional.empty());
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(42L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> taskService.startTask(42L))
             .isInstanceOf(TaskNotFoundException.class);
@@ -171,7 +195,7 @@ class TaskServiceTest {
     @Test
     void startTask_rollsBackToReady_whenPoolRejects() {
         Task task = taskWithId(1L, "run", 5, TaskStatus.READY);
-        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(task));
         when(taskRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         doThrow(new RejectedExecutionException()).when(taskExecutor).execute(any());
 
@@ -194,7 +218,7 @@ class TaskServiceTest {
         task.setScheduledAt(java.time.Instant.now().minusSeconds(60));
         when(taskRepository.findByTaskStatusAndScheduledAtIsNotNullAndScheduledAtLessThanEqual(
                 any(), any())).thenReturn(List.of(task));
-        when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(task));
         when(taskRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         taskService.startScheduledTasks();

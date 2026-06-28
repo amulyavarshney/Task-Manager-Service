@@ -9,6 +9,7 @@ interface Props {
   onStart: (id: number) => Promise<void>;
   onUpdate: (id: number, name: string, duration: number, priority: Task['priority'], tags: string[], maxRetries: number, scheduledAt: string | null) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
+  onPurge?: (id: number) => Promise<void>;
   onViewDetail: (task: Task) => void;
 }
 
@@ -44,14 +45,16 @@ function ProgressBar({ task }: { task: Task }) {
   );
 }
 
-export function TaskCard({ task, onStart, onUpdate, onDelete, onViewDetail }: Props) {
+export function TaskCard({ task, onStart, onUpdate, onDelete, onPurge, onViewDetail }: Props) {
   const [editing, setEditing] = useState(false);
   const [actionError, setActionError] = useState('');
   const [starting, setStarting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [purging, setPurging] = useState(false);
 
-  const canEdit = task.taskStatus === 'READY';
-  const canStart = task.taskStatus === 'READY';
+  const isDeleted = !!task.deletedAt;
+  const canEdit = task.taskStatus === 'READY' && !isDeleted;
+  const canStart = task.taskStatus === 'READY' && !isDeleted;
 
   async function handleStart(e: React.MouseEvent) {
     e.stopPropagation();
@@ -79,10 +82,27 @@ export function TaskCard({ task, onStart, onUpdate, onDelete, onViewDetail }: Pr
     }
   }
 
+  async function handlePurge(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm(`Permanently purge "${task.taskName}"? This cannot be undone.`)) return;
+    setPurging(true);
+    setActionError('');
+    try {
+      await onPurge!(task.taskId);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to purge task');
+      setPurging(false);
+    }
+  }
+
   return (
     <>
       <div
-        className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all p-5 cursor-pointer group"
+        className={`bg-white dark:bg-slate-800 rounded-xl border shadow-sm hover:shadow-md transition-all p-5 cursor-pointer group ${
+          isDeleted
+            ? 'border-slate-200 dark:border-slate-700 opacity-60'
+            : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+        }`}
         onClick={() => onViewDetail(task)}
       >
         <div className="flex items-start justify-between gap-3 mb-1">
@@ -136,6 +156,16 @@ export function TaskCard({ task, onStart, onUpdate, onDelete, onViewDetail }: Pr
           </p>
         )}
 
+        {isDeleted && task.deletedAt && (
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-3 flex items-center gap-1">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Deleted {new Date(task.deletedAt).toLocaleDateString()}
+          </p>
+        )}
+
         <div className="flex gap-2 mt-4" onClick={(e) => e.stopPropagation()}>
           {canStart && (
             <button
@@ -172,21 +202,34 @@ export function TaskCard({ task, onStart, onUpdate, onDelete, onViewDetail }: Pr
             </button>
           )}
 
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-400 dark:text-slate-500 text-sm hover:text-red-500 hover:border-red-200 dark:hover:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-            title="Delete"
-          >
-            {deleting ? (
-              <span className="w-4 h-4 border-2 border-slate-300 border-t-red-400 rounded-full animate-spin block" />
-            ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            )}
-          </button>
+          {isDeleted && onPurge && (
+            <button
+              onClick={handlePurge}
+              disabled={purging}
+              className="flex-1 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-700 text-red-500 dark:text-red-400 text-sm hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-center"
+              title="Permanently delete"
+            >
+              {purging ? 'Purging…' : 'Purge'}
+            </button>
+          )}
+
+          {!isDeleted && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-400 dark:text-slate-500 text-sm hover:text-red-500 hover:border-red-200 dark:hover:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              title="Delete"
+            >
+              {deleting ? (
+                <span className="w-4 h-4 border-2 border-slate-300 border-t-red-400 rounded-full animate-spin block" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              )}
+            </button>
+          )}
         </div>
       </div>
 

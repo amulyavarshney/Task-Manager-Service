@@ -108,4 +108,10 @@ public class Task {
 
     public Instant getScheduledAt() { return scheduledAt; }
     public void setScheduledAt(Instant scheduledAt) { this.scheduledAt = scheduledAt; }
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    public Instant getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
 }

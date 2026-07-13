@@ -11,7 +11,8 @@ export interface TaskListParams {
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
+  const base = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? '';
+  const res = await fetch(`${base}${url}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });

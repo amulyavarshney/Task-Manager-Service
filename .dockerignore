@@ -1,0 +1,15 @@
+target/
+.git/
+.idea/
+.vscode/
+*.iml
+.env
+.env.*
+!.env.example
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+**/hs_err_pid*
+*.log
+.DS_Store
+.playwright-mcp/

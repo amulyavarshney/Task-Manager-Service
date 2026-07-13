@@ -19,6 +19,9 @@ public class ExecutorConfig {
     @Value("${task.executor.queue-capacity:10}")
     private int queueCapacity;
 
+    @Value("${task.executor.await-termination-seconds:30}")
+    private int awaitTerminationSeconds;
+
     @Bean(name = "taskExecutor")
     public ThreadPoolTaskExecutor taskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -27,6 +30,8 @@ public class ExecutorConfig {
         executor.setQueueCapacity(queueCapacity);
         executor.setThreadNamePrefix("task-exec-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(awaitTerminationSeconds);
         executor.initialize();
         return executor;
     }

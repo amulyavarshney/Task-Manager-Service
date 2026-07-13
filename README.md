@@ -7,20 +7,15 @@ A Spring Boot REST API + React frontend for creating, managing, and asynchronous
 ```
 Task-Manager-Service/
 ├── src/                     # Spring Boot backend
-│   └── main/java/com/example/taskmanager/
-│       ├── controller/      # REST endpoints
-│       ├── service/         # Business logic & async executor
-│       ├── entity/          # Task JPA entity, TaskStatus enum
-│       ├── repository/      # Spring Data JPA
-│       ├── dto/             # Request/response DTOs
-│       ├── exception/       # RFC 7807 error handling
-│       └── config/          # Thread pool configuration
+│   └── main/
+│       ├── java/.../config/ # Executor, CORS, metrics
+│       └── resources/
+│           ├── application*.properties
+│           └── db/migration/  # Flyway SQL
 ├── frontend/                # React + Vite + TypeScript UI
-│   └── src/
-│       ├── api.ts           # Typed API client
-│       ├── types.ts         # Shared TypeScript types
-│       ├── App.tsx          # Main page (task grid, filters, polling)
-│       └── components/      # TaskCard, TaskFormModal, StatusBadge, StatsBar
+├── Dockerfile               # API image
+├── docker-compose.yml       # Postgres + API + nginx UI
+├── .github/workflows/ci.yml
 ├── pom.xml
 └── .env.example
 ```
@@ -30,7 +25,7 @@ Task-Manager-Service/
 ### Backend
 - Java 17+
 - Maven 3.9+
-- PostgreSQL running on `localhost:5432`
+- PostgreSQL running on `localhost:5432` (or use Docker Compose)
 
 ### Frontend
 - Node.js 18+
@@ -38,13 +33,25 @@ Task-Manager-Service/
 
 ## Setup
 
-### 1. Create the database
+### Option A — Docker Compose (recommended)
+
+```bash
+cp .env.example .env   # set DB_PASSWORD
+docker compose up --build
+# UI:  http://localhost:8088
+# API: http://localhost:8080
+# Health: http://localhost:8080/actuator/health
+```
+
+### Option B — Local processes
+
+#### 1. Create the database
 
 ```bash
 psql -U postgres -c "CREATE DATABASE taskmanager;"
 ```
 
-### 2. Configure credentials
+#### 2. Configure credentials
 
 ```bash
 export DB_USERNAME=postgres
@@ -52,16 +59,25 @@ export DB_PASSWORD=your_password_here
 # DB_URL defaults to jdbc:postgresql://localhost:5432/taskmanager
 ```
 
-Or copy `.env.example` to `.env` and source it. Hibernate will auto-create the `tasks` table on first startup.
+Or copy `.env.example` to `.env` and source it. Flyway applies `V1__create_tasks_schema.sql` on startup (`ddl-auto=validate`).
 
-### 3. Run the backend
+If you already have tables from an older Hibernate `ddl-auto=update` install, `spring.flyway.baseline-on-migrate=true` baselines the schema so Flyway does not re-run V1.
+
+#### 3. Run the backend
 
 ```bash
-mvn spring-boot:run
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 # API available at http://localhost:8080
+# Actuator: /actuator/health, /actuator/metrics
 ```
 
-### 4. Run the frontend
+Production profile (structured JSON logs):
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+#### 4. Run the frontend
 
 ```bash
 cd frontend
@@ -142,11 +158,25 @@ Key properties in `src/main/resources/application.properties`:
 | Property | Default | Description |
 |----------|---------|-------------|
 | `server.port` | `8080` | HTTP port |
+| `server.shutdown` | `graceful` | Drain in-flight HTTP requests |
 | `spring.datasource.url` | `jdbc:postgresql://localhost:5432/taskmanager` | DB URL |
+| `spring.jpa.hibernate.ddl-auto` | `validate` | Schema owned by Flyway |
+| `app.cors.allowed-origins` | `http://localhost:5173,...` | CORS allow-list (`CORS_ALLOWED_ORIGINS`) |
 | `task.executor.core-pool-size` | `2` | Always-alive threads |
 | `task.executor.max-pool-size` | `4` | Max concurrent task threads |
 | `task.executor.queue-capacity` | `10` | Pending task queue depth |
 | `task.scheduler.interval-ms` | `30000` | Auto-start poll interval |
+
+### Ops endpoints
+
+| Path | Purpose |
+|------|---------|
+| `/actuator/health` | Aggregate health |
+| `/actuator/health/liveness` | Liveness probe |
+| `/actuator/health/readiness` | Readiness probe |
+| `/actuator/metrics` | Micrometer metrics (incl. `taskmanager.executor.*`) |
+
+Profiles: `dev` (SQL logging), `prod` (structured JSON logs, stricter health).
 
 ## Testing
 

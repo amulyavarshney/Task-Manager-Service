@@ -46,6 +46,11 @@ export interface ExecutorStats {
   completedTaskCount: number;
 }
 
+export interface TaskStats {
+  total: number;
+  byStatus: Record<TaskStatus, number>;
+}
+
 export interface Toast {
   id: number;
   type: 'success' | 'error' | 'info';

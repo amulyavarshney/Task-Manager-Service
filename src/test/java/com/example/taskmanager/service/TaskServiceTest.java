@@ -90,13 +90,17 @@ class TaskServiceTest {
     @Test
     void updateTask_updatesFieldsAndSaves() {
         Task existing = taskWithId(1L, "old", 10, TaskStatus.READY);
+        existing.setMaxRetries(0);
         when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(existing));
         when(taskRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        Task result = taskService.updateTask(1L, request("new", 99));
+        CreateTaskRequest req = request("new", 99);
+        req.setMaxRetries(3);
+        Task result = taskService.updateTask(1L, req);
 
         assertThat(result.getTaskName()).isEqualTo("new");
         assertThat(result.getTaskDuration()).isEqualTo(99);
+        assertThat(result.getMaxRetries()).isEqualTo(3);
     }
 
     @Test
@@ -105,6 +109,63 @@ class TaskServiceTest {
 
         assertThatThrownBy(() -> taskService.updateTask(5L, request("x", 1)))
             .isInstanceOf(TaskNotFoundException.class);
+    }
+
+    // ── resetTask ─────────────────────────────────────────────────────────────
+
+    @Test
+    void resetTask_resetsFailedTaskToReady() {
+        Task task = taskWithId(1L, "failed", 5, TaskStatus.FAILED);
+        task.setStartedAt(java.time.Instant.now());
+        task.setCompletedAt(java.time.Instant.now());
+        task.setResultMessage("failed");
+        task.setRetryCount(2);
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(task));
+        when(taskRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Task result = taskService.resetTask(1L);
+
+        assertThat(result.getTaskStatus()).isEqualTo(TaskStatus.READY);
+        assertThat(result.getStartedAt()).isNull();
+        assertThat(result.getCompletedAt()).isNull();
+        assertThat(result.getResultMessage()).isNull();
+        assertThat(result.getRetryCount()).isEqualTo(0);
+    }
+
+    @Test
+    void resetTask_resetsDoneTaskToReady() {
+        Task task = taskWithId(1L, "done", 5, TaskStatus.DONE);
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(task));
+        when(taskRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(taskService.resetTask(1L).getTaskStatus()).isEqualTo(TaskStatus.READY);
+    }
+
+    @Test
+    void resetTask_throws_whenInProgress() {
+        Task task = taskWithId(1L, "run", 5, TaskStatus.IN_PROGRESS);
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(task));
+
+        assertThatThrownBy(() -> taskService.resetTask(1L))
+            .isInstanceOf(com.example.taskmanager.exception.TaskInvalidStateException.class);
+    }
+
+    // ── getTaskStats ──────────────────────────────────────────────────────────
+
+    @Test
+    void getTaskStats_aggregatesCountsByStatus() {
+        when(taskRepository.countActiveGroupedByStatus()).thenReturn(List.of(
+            new Object[]{TaskStatus.READY, 3L},
+            new Object[]{TaskStatus.DONE, 2L}
+        ));
+
+        var stats = taskService.getTaskStats();
+
+        assertThat(stats.getTotal()).isEqualTo(5);
+        assertThat(stats.getByStatus().get(TaskStatus.READY)).isEqualTo(3);
+        assertThat(stats.getByStatus().get(TaskStatus.DONE)).isEqualTo(2);
+        assertThat(stats.getByStatus().get(TaskStatus.IN_PROGRESS)).isEqualTo(0);
+        assertThat(stats.getByStatus().get(TaskStatus.FAILED)).isEqualTo(0);
     }
 
     // ── deleteTask (soft delete) ──────────────────────────────────────────────

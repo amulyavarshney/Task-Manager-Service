@@ -7,6 +7,7 @@ import { TaskFormModal } from './TaskFormModal';
 interface Props {
   task: Task;
   onStart: (id: number) => Promise<void>;
+  onReset?: (id: number) => Promise<void>;
   onUpdate: (id: number, name: string, duration: number, priority: Task['priority'], tags: string[], maxRetries: number, scheduledAt: string | null) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onPurge?: (id: number) => Promise<void>;
@@ -45,16 +46,18 @@ function ProgressBar({ task }: { task: Task }) {
   );
 }
 
-export function TaskCard({ task, onStart, onUpdate, onDelete, onPurge, onViewDetail }: Props) {
+export function TaskCard({ task, onStart, onReset, onUpdate, onDelete, onPurge, onViewDetail }: Props) {
   const [editing, setEditing] = useState(false);
   const [actionError, setActionError] = useState('');
   const [starting, setStarting] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [purging, setPurging] = useState(false);
 
   const isDeleted = !!task.deletedAt;
   const canEdit = task.taskStatus === 'READY' && !isDeleted;
   const canStart = task.taskStatus === 'READY' && !isDeleted;
+  const canReset = (task.taskStatus === 'FAILED' || task.taskStatus === 'DONE') && !isDeleted && !!onReset;
 
   async function handleStart(e: React.MouseEvent) {
     e.stopPropagation();
@@ -66,6 +69,19 @@ export function TaskCard({ task, onStart, onUpdate, onDelete, onPurge, onViewDet
       setActionError(err instanceof Error ? err.message : 'Failed to start task');
     } finally {
       setStarting(false);
+    }
+  }
+
+  async function handleReset(e: React.MouseEvent) {
+    e.stopPropagation();
+    setResetting(true);
+    setActionError('');
+    try {
+      await onReset!(task.taskId);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to reset task');
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -184,6 +200,29 @@ export function TaskCard({ task, onStart, onUpdate, onDelete, onPurge, onViewDet
                     <path d="M8 5v14l11-7z" />
                   </svg>
                   Run
+                </>
+              )}
+            </button>
+          )}
+
+          {canReset && (
+            <button
+              onClick={handleReset}
+              disabled={resetting}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {resetting ? (
+                <>
+                  <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Resetting…
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Reset
                 </>
               )}
             </button>

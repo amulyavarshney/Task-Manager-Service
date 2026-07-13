@@ -14,7 +14,7 @@ public class Task {
     @Column(name = "task_id")
     private Long taskId;
 
-    @Column(name = "task_name", nullable = false)
+    @Column(name = "task_name", nullable = false, length = 200)
     private String taskName;
 
     @Column(name = "task_duration", nullable = false)
@@ -30,7 +30,7 @@ public class Task {
 
     @ElementCollection
     @CollectionTable(name = "task_tags", joinColumns = @JoinColumn(name = "task_id"))
-    @Column(name = "tag")
+    @Column(name = "tag", length = 50)
     private List<String> tags = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -53,6 +53,13 @@ public class Task {
 
     @Column(name = "scheduled_at")
     private Instant scheduledAt;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
 
     public Task() {}
 
@@ -109,9 +116,9 @@ public class Task {
     public Instant getScheduledAt() { return scheduledAt; }
     public void setScheduledAt(Instant scheduledAt) { this.scheduledAt = scheduledAt; }
 
-    @Column(name = "deleted_at")
-    private Instant deletedAt;
-
     public Instant getDeletedAt() { return deletedAt; }
     public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }

@@ -1,4 +1,4 @@
-import type { Task, TaskStatus } from '../types';
+import type { TaskStatus, TaskStats } from '../types';
 
 const statusOrder: TaskStatus[] = ['READY', 'IN_PROGRESS', 'DONE', 'FAILED'];
 const labels: Record<TaskStatus, string> = { READY: 'Ready', IN_PROGRESS: 'In Progress', DONE: 'Done', FAILED: 'Failed' };
@@ -10,30 +10,26 @@ const colors: Record<TaskStatus, string> = {
 };
 
 interface Props {
-  tasks: Task[];
-  totalElements: number;
+  stats: TaskStats | null;
   selected: Set<number>;
+  readySelected: number;
   onBulkStart: () => void;
   onBulkDelete: () => void;
 }
 
-export function StatsBar({ tasks, totalElements, selected, onBulkStart, onBulkDelete }: Props) {
-  const counts = tasks.reduce<Record<TaskStatus, number>>(
-    (acc, t) => { acc[t.taskStatus]++; return acc; },
-    { READY: 0, IN_PROGRESS: 0, DONE: 0, FAILED: 0 }
-  );
-
-  const readySelected = tasks.filter((t) => selected.has(t.taskId) && t.taskStatus === 'READY').length;
+export function StatsBar({ stats, selected, readySelected, onBulkStart, onBulkDelete }: Props) {
+  const total = stats?.total ?? 0;
+  const counts = stats?.byStatus ?? { READY: 0, IN_PROGRESS: 0, DONE: 0, FAILED: 0 };
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex gap-5 flex-wrap">
         <div className="text-sm text-slate-500 dark:text-slate-400">
-          <span className="font-semibold text-slate-800 dark:text-slate-100 text-lg">{totalElements}</span>{' '}total
+          <span className="font-semibold text-slate-800 dark:text-slate-100 text-lg">{total}</span>{' '}total
         </div>
         {statusOrder.map((s) => (
           <div key={s} className={`text-sm ${colors[s]}`}>
-            <span className="font-semibold text-lg">{counts[s]}</span>{' '}{labels[s]}
+            <span className="font-semibold text-lg">{counts[s] ?? 0}</span>{' '}{labels[s]}
           </div>
         ))}
       </div>

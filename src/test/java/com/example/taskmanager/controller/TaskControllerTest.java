@@ -48,7 +48,7 @@ class TaskControllerTest {
         PagedTaskResponse paged = new PagedTaskResponse(
             new PageImpl<>(tasks, PageRequest.of(0, 20), 2)
         );
-        when(taskService.getTasksPaged(any())).thenReturn(paged);
+        when(taskService.getTasksPaged(any(), any(), any(), any(), any())).thenReturn(paged);
 
         mockMvc.perform(get("/api/tasks"))
             .andExpect(status().isOk())
@@ -65,7 +65,7 @@ class TaskControllerTest {
         PagedTaskResponse empty = new PagedTaskResponse(
             new PageImpl<>(List.of(), PageRequest.of(0, 20), 0)
         );
-        when(taskService.getTasksPaged(any())).thenReturn(empty);
+        when(taskService.getTasksPaged(any(), any(), any(), any(), any())).thenReturn(empty);
 
         mockMvc.perform(get("/api/tasks?page=0&size=20"))
             .andExpect(status().isOk())
@@ -192,7 +192,7 @@ class TaskControllerTest {
 
         mockMvc.perform(post("/api/tasks/1/start"))
             .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.detail").value("Task 1 is already IN_PROGRESS or DONE and cannot be started again."));
+            .andExpect(jsonPath("$.detail").value("Task 1 is not in READY status and cannot be started."));
     }
 
     @Test
@@ -202,6 +202,63 @@ class TaskControllerTest {
         mockMvc.perform(post("/api/tasks/1/start"))
             .andExpect(status().isServiceUnavailable())
             .andExpect(jsonPath("$.detail").value("Thread pool is at capacity. Please retry later."));
+    }
+
+    // ── POST /api/tasks/{id}/reset ────────────────────────────────────────────
+
+    @Test
+    void resetTask_returns200_withReadyStatus() throws Exception {
+        when(taskService.resetTask(1L)).thenReturn(task(1L, "retry", 5, TaskStatus.READY));
+
+        mockMvc.perform(post("/api/tasks/1/reset"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.taskStatus").value("READY"));
+    }
+
+    @Test
+    void resetTask_returns409_whenInvalidState() throws Exception {
+        when(taskService.resetTask(1L))
+            .thenThrow(new com.example.taskmanager.exception.TaskInvalidStateException(
+                "Task 1 must be FAILED or DONE to reset (current: IN_PROGRESS)"));
+
+        mockMvc.perform(post("/api/tasks/1/reset"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("must be FAILED or DONE")));
+    }
+
+    // ── GET /api/tasks/stats ──────────────────────────────────────────────────
+
+    @Test
+    void getTaskStats_returns200() throws Exception {
+        java.util.Map<TaskStatus, Long> byStatus = new java.util.EnumMap<>(TaskStatus.class);
+        byStatus.put(TaskStatus.READY, 2L);
+        byStatus.put(TaskStatus.IN_PROGRESS, 1L);
+        byStatus.put(TaskStatus.DONE, 0L);
+        byStatus.put(TaskStatus.FAILED, 0L);
+        when(taskService.getTaskStats())
+            .thenReturn(new com.example.taskmanager.dto.TaskStatsResponse(3, byStatus));
+
+        mockMvc.perform(get("/api/tasks/stats"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.total").value(3))
+            .andExpect(jsonPath("$.byStatus.READY").value(2))
+            .andExpect(jsonPath("$.byStatus.IN_PROGRESS").value(1));
+    }
+
+    // ── GET /api/tasks?status= ────────────────────────────────────────────────
+
+    @Test
+    void getAllTasks_passesFiltersToService() throws Exception {
+        PagedTaskResponse empty = new PagedTaskResponse(
+            new PageImpl<>(List.of(), PageRequest.of(0, 20), 0)
+        );
+        when(taskService.getTasksPaged(any(), eq(TaskStatus.READY), any(), eq("build"), any()))
+            .thenReturn(empty);
+
+        mockMvc.perform(get("/api/tasks?status=READY&search=build"))
+            .andExpect(status().isOk());
+
+        verify(taskService).getTasksPaged(any(), eq(TaskStatus.READY), any(), eq("build"), any());
     }
 
     // ── GET /api/tasks/history ────────────────────────────────────────────────
@@ -215,7 +272,7 @@ class TaskControllerTest {
                 java.util.List.of(deleted),
                 org.springframework.data.domain.PageRequest.of(0, 20), 1)
         );
-        when(taskService.getTaskHistory(any())).thenReturn(paged);
+        when(taskService.getTaskHistory(any(), any(), any(), any(), any())).thenReturn(paged);
 
         mockMvc.perform(get("/api/tasks/history"))
             .andExpect(status().isOk())

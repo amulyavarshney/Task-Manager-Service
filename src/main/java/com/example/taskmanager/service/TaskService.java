@@ -2,21 +2,26 @@ package com.example.taskmanager.service;
 
 import com.example.taskmanager.dto.CreateTaskRequest;
 import com.example.taskmanager.dto.PagedTaskResponse;
+import com.example.taskmanager.dto.TaskStatsResponse;
 import com.example.taskmanager.entity.Task;
+import com.example.taskmanager.entity.TaskPriority;
 import com.example.taskmanager.entity.TaskStatus;
 import com.example.taskmanager.exception.TaskAlreadyRunningException;
+import com.example.taskmanager.exception.TaskInvalidStateException;
 import com.example.taskmanager.exception.TaskNotFoundException;
 import com.example.taskmanager.repository.TaskRepository;
+import com.example.taskmanager.repository.TaskSpecifications;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.time.Instant;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.RejectedExecutionException;
@@ -43,11 +48,50 @@ public class TaskService {
     }
 
     public PagedTaskResponse getTasksPaged(Pageable pageable) {
-        return new PagedTaskResponse(taskRepository.findByDeletedAtIsNull(pageable));
+        return getTasksPaged(pageable, null, null, null, null);
+    }
+
+    public PagedTaskResponse getTasksPaged(
+            Pageable pageable,
+            TaskStatus status,
+            TaskPriority priority,
+            String search,
+            String tag) {
+        Specification<Task> spec = Specification
+                .where(TaskSpecifications.active())
+                .and(TaskSpecifications.withFilters(status, priority, search, tag));
+        return new PagedTaskResponse(taskRepository.findAll(spec, pageable));
     }
 
     public PagedTaskResponse getTaskHistory(Pageable pageable) {
-        return new PagedTaskResponse(taskRepository.findByDeletedAtIsNotNull(pageable));
+        return getTaskHistory(pageable, null, null, null, null);
+    }
+
+    public PagedTaskResponse getTaskHistory(
+            Pageable pageable,
+            TaskStatus status,
+            TaskPriority priority,
+            String search,
+            String tag) {
+        Specification<Task> spec = Specification
+                .where(TaskSpecifications.deleted())
+                .and(TaskSpecifications.withFilters(status, priority, search, tag));
+        return new PagedTaskResponse(taskRepository.findAll(spec, pageable));
+    }
+
+    public TaskStatsResponse getTaskStats() {
+        Map<TaskStatus, Long> byStatus = new EnumMap<>(TaskStatus.class);
+        for (TaskStatus s : TaskStatus.values()) {
+            byStatus.put(s, 0L);
+        }
+        long total = 0;
+        for (Object[] row : taskRepository.countActiveGroupedByStatus()) {
+            TaskStatus status = (TaskStatus) row[0];
+            long count = (Long) row[1];
+            byStatus.put(status, count);
+            total += count;
+        }
+        return new TaskStatsResponse(total, byStatus);
     }
 
     public Task getTaskById(Long id) {
@@ -79,6 +123,7 @@ public class TaskService {
         if (request.getTags() != null) {
             task.setTags(request.getTags());
         }
+        task.setMaxRetries(request.getMaxRetries());
         task.setScheduledAt(request.getScheduledAt());
         return taskRepository.save(task);
     }
@@ -123,6 +168,21 @@ public class TaskService {
         }
 
         return task;
+    }
+
+    @Transactional
+    public Task resetTask(Long id) {
+        Task task = getTaskById(id);
+        if (task.getTaskStatus() != TaskStatus.FAILED && task.getTaskStatus() != TaskStatus.DONE) {
+            throw new TaskInvalidStateException(
+                    "Task " + id + " must be FAILED or DONE to reset (current: " + task.getTaskStatus() + ")");
+        }
+        task.setTaskStatus(TaskStatus.READY);
+        task.setStartedAt(null);
+        task.setCompletedAt(null);
+        task.setResultMessage(null);
+        task.setRetryCount(0);
+        return taskRepository.save(task);
     }
 
     public void startScheduledTasks() {

@@ -3,6 +3,9 @@ package com.example.taskmanager.controller;
 import com.example.taskmanager.dto.CreateTaskRequest;
 import com.example.taskmanager.dto.PagedTaskResponse;
 import com.example.taskmanager.dto.TaskResponse;
+import com.example.taskmanager.dto.TaskStatsResponse;
+import com.example.taskmanager.entity.TaskPriority;
+import com.example.taskmanager.entity.TaskStatus;
 import com.example.taskmanager.service.TaskService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
@@ -26,8 +29,27 @@ public class TaskController {
 
     @GetMapping("/tasks")
     public ResponseEntity<PagedTaskResponse> getAllTasks(
+            @RequestParam(required = false) TaskStatus status,
+            @RequestParam(required = false) TaskPriority priority,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String tag,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(taskService.getTasksPaged(pageable));
+        return ResponseEntity.ok(taskService.getTasksPaged(pageable, status, priority, search, tag));
+    }
+
+    @GetMapping("/tasks/stats")
+    public ResponseEntity<TaskStatsResponse> getTaskStats() {
+        return ResponseEntity.ok(taskService.getTaskStats());
+    }
+
+    @GetMapping("/tasks/history")
+    public ResponseEntity<PagedTaskResponse> getTaskHistory(
+            @RequestParam(required = false) TaskStatus status,
+            @RequestParam(required = false) TaskPriority priority,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String tag,
+            @PageableDefault(size = 20, sort = "deletedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(taskService.getTaskHistory(pageable, status, priority, search, tag));
     }
 
     @GetMapping("/tasks/{id}")
@@ -60,10 +82,9 @@ public class TaskController {
         return ResponseEntity.ok(TaskResponse.from(taskService.startTask(id)));
     }
 
-    @GetMapping("/tasks/history")
-    public ResponseEntity<PagedTaskResponse> getTaskHistory(
-            @PageableDefault(size = 20, sort = "deletedAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(taskService.getTaskHistory(pageable));
+    @PostMapping("/tasks/{id}/reset")
+    public ResponseEntity<TaskResponse> resetTask(@PathVariable Long id) {
+        return ResponseEntity.ok(TaskResponse.from(taskService.resetTask(id)));
     }
 
     @DeleteMapping("/tasks/{id}/purge")

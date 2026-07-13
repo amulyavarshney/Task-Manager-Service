@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 
@@ -19,14 +19,16 @@ public class TaskRunner {
 
     private final TaskRepository taskRepository;
     private final ThreadPoolTaskExecutor taskExecutor;
+    private final TransactionTemplate transactionTemplate;
 
     public TaskRunner(TaskRepository taskRepository,
-                      @Qualifier("taskExecutor") ThreadPoolTaskExecutor taskExecutor) {
+                      @Qualifier("taskExecutor") ThreadPoolTaskExecutor taskExecutor,
+                      TransactionTemplate transactionTemplate) {
         this.taskRepository = taskRepository;
         this.taskExecutor = taskExecutor;
+        this.transactionTemplate = transactionTemplate;
     }
 
-    @Transactional
     public void run(Long taskId, int durationSeconds) {
         log.info("Task {} started, sleeping for {} seconds", taskId, durationSeconds);
         Instant runStart = Instant.now();
@@ -39,35 +41,41 @@ public class TaskRunner {
             return;
         }
 
-        Task task = taskRepository.findById(taskId).orElse(null);
-        if (task == null) {
-            log.warn("Task {} was deleted before completion", taskId);
-            return;
-        }
+        transactionTemplate.executeWithoutResult(status -> {
+            Task task = taskRepository.findById(taskId).orElse(null);
+            if (task == null) {
+                log.warn("Task {} was deleted before completion", taskId);
+                return;
+            }
 
-        Instant completedAt = Instant.now();
-        double elapsed = (completedAt.toEpochMilli() - runStart.toEpochMilli()) / 1000.0;
-        task.setTaskStatus(TaskStatus.DONE);
-        task.setCompletedAt(completedAt);
-        task.setResultMessage(String.format("Completed successfully in %.1fs", elapsed));
-        taskRepository.save(task);
-        log.info("Task {} completed and marked DONE", taskId);
+            Instant completedAt = Instant.now();
+            double elapsed = (completedAt.toEpochMilli() - runStart.toEpochMilli()) / 1000.0;
+            task.setTaskStatus(TaskStatus.DONE);
+            task.setCompletedAt(completedAt);
+            task.setResultMessage(String.format("Completed successfully in %.1fs", elapsed));
+            taskRepository.save(task);
+            log.info("Task {} completed and marked DONE", taskId);
+        });
     }
 
     private void handleInterruption(Long taskId, int durationSeconds, Instant runStart) {
-        Task task = taskRepository.findById(taskId).orElse(null);
-        if (task == null) return;
+        Boolean shouldRetry = transactionTemplate.execute(status -> {
+            Task task = taskRepository.findById(taskId).orElse(null);
+            if (task == null) {
+                return false;
+            }
 
-        if (task.getRetryCount() < task.getMaxRetries()) {
-            int nextRetry = task.getRetryCount() + 1;
-            task.setRetryCount(nextRetry);
-            task.setTaskStatus(TaskStatus.IN_PROGRESS);
-            task.setStartedAt(Instant.now());
-            task.setResultMessage(String.format("Retry %d/%d in progress", nextRetry, task.getMaxRetries()));
-            taskRepository.save(task);
-            log.info("Task {} scheduling retry {}/{}", taskId, nextRetry, task.getMaxRetries());
-            taskExecutor.execute(() -> run(taskId, durationSeconds));
-        } else {
+            if (task.getRetryCount() < task.getMaxRetries()) {
+                int nextRetry = task.getRetryCount() + 1;
+                task.setRetryCount(nextRetry);
+                task.setTaskStatus(TaskStatus.IN_PROGRESS);
+                task.setStartedAt(Instant.now());
+                task.setResultMessage(String.format("Retry %d/%d in progress", nextRetry, task.getMaxRetries()));
+                taskRepository.save(task);
+                log.info("Task {} scheduling retry {}/{}", taskId, nextRetry, task.getMaxRetries());
+                return true;
+            }
+
             double elapsed = (Instant.now().toEpochMilli() - runStart.toEpochMilli()) / 1000.0;
             task.setTaskStatus(TaskStatus.FAILED);
             task.setResultMessage(task.getMaxRetries() > 0
@@ -76,6 +84,11 @@ public class TaskRunner {
                     : String.format("Task failed (interrupted after %.1fs)", elapsed));
             taskRepository.save(task);
             log.warn("Task {} marked FAILED", taskId);
+            return false;
+        });
+
+        if (Boolean.TRUE.equals(shouldRetry)) {
+            taskExecutor.execute(() -> run(taskId, durationSeconds));
         }
     }
 }

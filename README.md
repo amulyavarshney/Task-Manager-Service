@@ -74,22 +74,29 @@ Open `http://localhost:5173` in your browser to use the app.
 
 ## Frontend Features
 
-- **Task grid** — view all tasks with status badges (Ready / In Progress / Done)
-- **Create & edit** — modal form with name and duration inputs
-- **Run tasks** — one-click async execution; UI auto-polls every 2s until completion
-- **Filter & search** — filter by status, search by name
-- **Stats bar** — live counts per status
+- **Task grid** — status badges (Ready / In Progress / Done / Failed), priority, tags
+- **Create & edit** — modal with duration, priority, tags, retries, scheduling
+- **Run / reset** — start READY tasks; reset FAILED or DONE back to READY
+- **Server-side filter & search** — status filter and name/tag search across all pages
+- **Stats bar** — global counts per status (not page-local)
+- **History** — soft-deleted tasks with permanent purge
+- **Dark mode**, keyboard shortcuts, templates, executor panel
 
 ## API Reference
 
 | Method | Endpoint | Description | Success | Errors |
 |--------|----------|-------------|---------|--------|
-| `GET` | `/api/tasks` | List all tasks | 200 | — |
+| `GET` | `/api/tasks` | List active tasks (paged; optional `status`, `priority`, `search`, `tag`) | 200 | 400 |
+| `GET` | `/api/tasks/stats` | Global active-task counts by status | 200 | — |
+| `GET` | `/api/tasks/history` | List soft-deleted tasks (same filters) | 200 | 400 |
 | `GET` | `/api/tasks/{id}` | Get a task | 200 | 404 |
 | `POST` | `/api/tasks` | Create a task | 201 | 400 |
-| `PUT` | `/api/tasks/{id}` | Update name/duration | 200 | 400, 404 |
-| `DELETE` | `/api/tasks/{id}` | Delete a task | 204 | 404 |
+| `PUT` | `/api/tasks/{id}` | Update task fields (incl. `maxRetries`) | 200 | 400, 404, 409 |
+| `DELETE` | `/api/tasks/{id}` | Soft-delete a task | 204 | 404 |
+| `DELETE` | `/api/tasks/{id}/purge` | Hard-delete a task | 204 | 404 |
 | `POST` | `/api/tasks/{id}/start` | Start async execution | 200 | 404, 409, 503 |
+| `POST` | `/api/tasks/{id}/reset` | Reset FAILED/DONE → READY | 200 | 404, 409 |
+| `GET` | `/api/executor/stats` | Thread pool metrics | 200 | — |
 
 ### Task object
 
@@ -98,11 +105,17 @@ Open `http://localhost:5173` in your browser to use the app.
   "taskId": 1,
   "taskName": "my-task",
   "taskDuration": 10,
-  "taskStatus": "READY"
+  "taskStatus": "READY",
+  "priority": "MEDIUM",
+  "tags": ["ops"],
+  "maxRetries": 2,
+  "retryCount": 0,
+  "scheduledAt": null,
+  "deletedAt": null
 }
 ```
 
-`taskStatus` lifecycle: `READY` → `IN_PROGRESS` → `DONE`
+`taskStatus` lifecycle: `READY` → `IN_PROGRESS` → `DONE` | `FAILED` (reset → `READY`)
 
 ### Error responses (RFC 7807)
 
@@ -111,17 +124,16 @@ Open `http://localhost:5173` in your browser to use the app.
   "type": "about:blank",
   "title": "Conflict",
   "status": 409,
-  "detail": "Task 1 is already IN_PROGRESS or DONE and cannot be started again.",
-  "instance": "/api/tasks/1/start"
+  "detail": "Task 1 is not in READY status and cannot be started."
 }
 ```
 
 | Status | Cause |
 |--------|-------|
-| 400 | Blank task name or duration < 1 |
+| 400 | Validation failure (blank name, duration bounds, etc.) |
 | 404 | Task ID not found |
-| 409 | Task already `IN_PROGRESS` or `DONE` |
-| 503 | Thread pool at capacity (max 4 concurrent tasks) |
+| 409 | Invalid state (start non-READY, reset non-FAILED/DONE, optimistic lock) |
+| 503 | Thread pool at capacity |
 
 ## Configuration
 
@@ -134,6 +146,7 @@ Key properties in `src/main/resources/application.properties`:
 | `task.executor.core-pool-size` | `2` | Always-alive threads |
 | `task.executor.max-pool-size` | `4` | Max concurrent task threads |
 | `task.executor.queue-capacity` | `10` | Pending task queue depth |
+| `task.scheduler.interval-ms` | `30000` | Auto-start poll interval |
 
 ## Testing
 
@@ -141,10 +154,11 @@ Key properties in `src/main/resources/application.properties`:
 mvn test
 ```
 
-Tests run against an H2 in-memory database (no PostgreSQL needed). 28 tests across:
+Tests run against an H2 in-memory database (no PostgreSQL needed). Coverage includes:
 
-- `TaskServiceTest` — unit tests for all service methods and edge cases
-- `TaskControllerTest` — MockMvc slice tests for all endpoints
+- `TaskServiceTest` — unit tests for service methods (create, update, reset, stats, start)
+- `TaskControllerTest` — MockMvc slice tests for endpoints and filters
+- `TaskRunnerTest` — async completion, interruption, and retry behavior
 - `TaskManagerApplicationTests` — Spring context smoke test
 
 ## License

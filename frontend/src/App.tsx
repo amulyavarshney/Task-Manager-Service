@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { Task, TaskStatus, TaskPriority, ExecutorStats, Toast, SortField, SortDir } from './types';
+import type { Task, TaskStatus, TaskPriority, ExecutorStats, TaskStats, Toast, SortField, SortDir } from './types';
 import { useDarkMode } from './hooks/useDarkMode';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTemplates } from './hooks/useTemplates';
@@ -14,6 +14,7 @@ import { Pagination } from './components/Pagination';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 
 const POLL_INTERVAL_MS = 2000;
+const SEARCH_DEBOUNCE_MS = 300;
 
 type FilterStatus = 'ALL' | TaskStatus;
 
@@ -46,10 +47,12 @@ export default function App() {
   const [showCreate, setShowCreate] = useState(false);
   const [filter, setFilter] = useState<FilterStatus>('ALL');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [executorStats, setExecutorStats] = useState<ExecutorStats | null>(null);
+  const [taskStats, setTaskStats] = useState<TaskStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [showExecutor, setShowExecutor] = useState(false);
   const [page, setPage] = useState(0);
@@ -69,28 +72,75 @@ export default function App() {
     setToasts((prev) => [...prev, { id, type, message }]);
   }
 
-  const fetchTasks = useCallback(async (opts?: { page?: number; size?: number; sortIdx?: number; history?: boolean }) => {
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [filter, debouncedSearch]);
+
+  const fetchTasks = useCallback(async (opts?: {
+    page?: number;
+    size?: number;
+    sortIdx?: number;
+    history?: boolean;
+    status?: FilterStatus;
+    search?: string;
+  }) => {
     const currentSort = SORT_OPTIONS[opts?.sortIdx ?? sortIndex];
     const isHistory = opts?.history ?? showHistory;
     const fetcher = isHistory ? api.getHistory : api.listTasks;
+    const requestPage = opts?.page ?? page;
     try {
       const data = await fetcher({
-        page: opts?.page ?? page,
+        page: requestPage,
         size: opts?.size ?? pageSize,
         sort: `${currentSort.field},${currentSort.dir}`,
+        status: opts?.status ?? filter,
+        search: opts?.search !== undefined ? (opts.search || undefined) : (debouncedSearch || undefined),
       });
       setTasks(data.content);
       setTotalPages(data.totalPages);
       setTotalElements(data.totalElements);
       setError('');
-      setDetailTask((prev) => prev ? data.content.find((t) => t.taskId === prev.taskId) ?? null : null);
+      setDetailTask((prev) => prev ? data.content.find((t) => t.taskId === prev.taskId) ?? prev : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load tasks');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, sortIndex, showHistory]);
+  }, [page, pageSize, sortIndex, showHistory, filter, debouncedSearch]);
 
-  const fetchStats = useCallback(async () => {
+  // Refetch whenever list query params change (including debounced search / filter → page reset)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const currentSort = SORT_OPTIONS[sortIndex];
+      const fetcher = showHistory ? api.getHistory : api.listTasks;
+      try {
+        const data = await fetcher({
+          page,
+          size: pageSize,
+          sort: `${currentSort.field},${currentSort.dir}`,
+          status: filter,
+          search: debouncedSearch || undefined,
+        });
+        if (cancelled) return;
+        setTasks(data.content);
+        setTotalPages(data.totalPages);
+        setTotalElements(data.totalElements);
+        setError('');
+        setDetailTask((prev) => prev ? data.content.find((t) => t.taskId === prev.taskId) ?? prev : null);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load tasks');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [page, pageSize, sortIndex, showHistory, filter, debouncedSearch]);
+
+  const fetchExecutorStats = useCallback(async () => {
     try {
       const data = await api.getExecutorStats();
       setExecutorStats(data);
@@ -101,10 +151,19 @@ export default function App() {
     }
   }, []);
 
+  const fetchTaskStats = useCallback(async () => {
+    if (showHistory) return;
+    try {
+      setTaskStats(await api.getTaskStats());
+    } catch {
+      // non-critical
+    }
+  }, [showHistory]);
+
   const shortcuts = useMemo(() => ({
     onNew: () => { if (!showCreate && !detailTask && !showHelp) setShowCreate(true); },
     onFocusSearch: () => searchRef.current?.focus(),
-    onRefresh: () => { fetchTasks(); fetchStats(); },
+    onRefresh: () => { fetchTasks(); fetchExecutorStats(); fetchTaskStats(); },
     onEscape: () => {
       if (showHelp) { setShowHelp(false); return; }
       if (showCreate) { setShowCreate(false); return; }
@@ -113,24 +172,34 @@ export default function App() {
     },
     onToggleDark: () => setDark((d) => !d),
     onHelp: () => setShowHelp((v) => !v),
-  }), [showCreate, detailTask, showHelp, selected, fetchTasks, fetchStats, setDark]);
+  }), [showCreate, detailTask, showHelp, selected, fetchTasks, fetchExecutorStats, fetchTaskStats, setDark]);
 
   useKeyboardShortcuts(shortcuts);
 
   useEffect(() => {
-    Promise.all([fetchTasks(), fetchStats()]).finally(() => setLoading(false));
-  }, [fetchTasks, fetchStats]);
+    fetchExecutorStats();
+    fetchTaskStats();
+  }, [fetchExecutorStats, fetchTaskStats]);
 
   useEffect(() => {
     const hasRunning = !showHistory && tasks.some((t) => t.taskStatus === 'IN_PROGRESS');
     if (hasRunning && !pollingRef.current) {
-      pollingRef.current = setInterval(() => { fetchTasks(); fetchStats(); }, POLL_INTERVAL_MS);
+      pollingRef.current = setInterval(() => {
+        fetchTasks();
+        fetchExecutorStats();
+        fetchTaskStats();
+      }, POLL_INTERVAL_MS);
     } else if (!hasRunning && pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
-    return () => { if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; } };
-  }, [tasks, fetchTasks, fetchStats]);
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [tasks, fetchTasks, fetchExecutorStats, fetchTaskStats, showHistory]);
 
   async function handlePurge(id: number) {
     const name = tasks.find((t) => t.taskId === id)?.taskName ?? `#${id}`;
@@ -142,41 +211,43 @@ export default function App() {
   }
 
   function handleToggleHistory() {
-    const next = !showHistory;
-    setShowHistory(next);
+    setShowHistory((prev) => !prev);
     setPage(0);
     setFilter('ALL');
     setSearch('');
-    fetchTasks({ page: 0, history: next });
+    setDebouncedSearch('');
+  }
+
+  function handleFilterChange(value: FilterStatus) {
+    setFilter(value);
+    setPage(0);
   }
 
   function handlePageChange(newPage: number) {
     setPage(newPage);
-    fetchTasks({ page: newPage });
   }
 
   function handlePageSizeChange(newSize: number) {
     setPage(0);
     setPageSize(newSize);
-    fetchTasks({ page: 0, size: newSize });
   }
 
   function handleSortChange(idx: number) {
     setSortIndex(idx);
     setPage(0);
-    fetchTasks({ page: 0, sortIdx: idx });
   }
 
   async function handleCreate(name: string, duration: number, priority: TaskPriority, tags: string[], maxRetries: number, scheduledAt: string | null) {
     await api.createTask({ taskName: name, taskDuration: duration, priority, tags, maxRetries, scheduledAt });
     setPage(0);
-    await fetchTasks({ page: 0 });
+    await Promise.all([fetchTasks({ page: 0 }), fetchTaskStats()]);
     toast('success', `Task "${name}" created`);
   }
 
   async function handleUpdate(id: number, name: string, duration: number, priority: TaskPriority, tags: string[], maxRetries: number, scheduledAt: string | null) {
     const updated = await api.updateTask(id, { taskName: name, taskDuration: duration, priority, tags, maxRetries, scheduledAt });
     setTasks((prev) => prev.map((t) => (t.taskId === id ? updated : t)));
+    setDetailTask((prev) => prev?.taskId === id ? updated : prev);
     toast('success', `Task "${name}" updated`);
   }
 
@@ -185,7 +256,7 @@ export default function App() {
     await api.deleteTask(id);
     setSelected((prev) => { const s = new Set(prev); s.delete(id); return s; });
     if (detailTask?.taskId === id) setDetailTask(null);
-    await fetchTasks();
+    await Promise.all([fetchTasks(), fetchTaskStats()]);
     toast('info', `Task "${name}" deleted`);
   }
 
@@ -194,7 +265,16 @@ export default function App() {
     setTasks((prev) => prev.map((t) => (t.taskId === id ? updated : t)));
     setDetailTask((prev) => prev?.taskId === id ? updated : prev);
     toast('info', `Task "${updated.taskName}" started`);
-    fetchStats();
+    fetchExecutorStats();
+    fetchTaskStats();
+  }
+
+  async function handleReset(id: number) {
+    const updated = await api.resetTask(id);
+    setTasks((prev) => prev.map((t) => (t.taskId === id ? updated : t)));
+    setDetailTask((prev) => prev?.taskId === id ? updated : prev);
+    toast('success', `Task "${updated.taskName}" reset to Ready`);
+    fetchTaskStats();
   }
 
   async function handleBulkStart() {
@@ -213,7 +293,7 @@ export default function App() {
       try { await api.deleteTask(id); ok++; } catch { /* skip */ }
     }
     setSelected(new Set());
-    await fetchTasks({ page: 0 });
+    await Promise.all([fetchTasks({ page: 0 }), fetchTaskStats()]);
     setPage(0);
     toast('info', `Deleted ${ok} task${ok > 1 ? 's' : ''}`);
   }
@@ -226,12 +306,7 @@ export default function App() {
     });
   }
 
-  const filtered = tasks.filter((t) => {
-    const matchesStatus = filter === 'ALL' || t.taskStatus === filter;
-    const matchesSearch = t.taskName.toLowerCase().includes(search.toLowerCase()) ||
-      t.tags?.some((tag) => tag.toLowerCase().includes(search.toLowerCase()));
-    return matchesStatus && matchesSearch;
-  });
+  const readySelected = tasks.filter((t) => selected.has(t.taskId) && t.taskStatus === 'READY').length;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -291,7 +366,7 @@ export default function App() {
             </button>
 
             <button
-              onClick={() => { setShowExecutor((v) => !v); fetchStats(); }}
+              onClick={() => { setShowExecutor((v) => !v); fetchExecutorStats(); }}
               title="Thread pool"
               className={`p-2 border rounded-lg text-sm transition-colors ${
                 showExecutor
@@ -320,7 +395,6 @@ export default function App() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 text-slate-800 dark:text-slate-100">
-        {/* History mode banner */}
         {showHistory && (
           <div className="mb-6 flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-300 text-sm rounded-lg px-4 py-3">
             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -333,27 +407,24 @@ export default function App() {
           </div>
         )}
 
-        {/* Executor panel */}
         {showExecutor && (
           <div className="mb-6">
             <ExecutorPanel stats={executorStats} loading={statsLoading} />
           </div>
         )}
 
-        {/* Stats */}
-        {!loading && tasks.length > 0 && (
+        {!loading && !showHistory && (
           <div className="mb-6">
             <StatsBar
-              tasks={tasks}
-              totalElements={totalElements}
+              stats={taskStats}
               selected={selected}
+              readySelected={readySelected}
               onBulkStart={handleBulkStart}
               onBulkDelete={handleBulkDelete}
             />
           </div>
         )}
 
-        {/* Filters & Search */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
@@ -375,7 +446,7 @@ export default function App() {
             {filterOptions.map((opt) => (
               <button
                 key={opt.value}
-                onClick={() => setFilter(opt.value)}
+                onClick={() => handleFilterChange(opt.value)}
                 className={`px-3 py-1 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                   filter === opt.value ? 'bg-blue-600 text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100'
                 }`}
@@ -397,7 +468,7 @@ export default function App() {
           </select>
 
           <button
-            onClick={() => { fetchTasks(); fetchStats(); }}
+            onClick={() => { fetchTasks(); fetchExecutorStats(); fetchTaskStats(); }}
             title="Refresh"
             className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
           >
@@ -408,7 +479,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* Error banner */}
         {error && (
           <div className="mb-6 flex items-center gap-2 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm rounded-lg px-4 py-3">
             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -419,7 +489,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Loading skeleton */}
         {loading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -433,8 +502,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Empty state */}
-        {!loading && filtered.length === 0 && (
+        {!loading && tasks.length === 0 && (
           <div className="text-center py-20">
             <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -442,7 +510,12 @@ export default function App() {
                   d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
-            {tasks.length === 0 ? (
+            {filter !== 'ALL' || debouncedSearch ? (
+              <>
+                <p className="text-slate-600 dark:text-slate-300 font-medium mb-1">No matching tasks</p>
+                <p className="text-slate-400 dark:text-slate-500 text-sm">Try a different search or filter</p>
+              </>
+            ) : (
               <>
                 <p className="text-slate-600 dark:text-slate-300 font-medium mb-1">No tasks yet</p>
                 <p className="text-slate-400 dark:text-slate-500 text-sm mb-5">Create your first task to get started</p>
@@ -451,21 +524,14 @@ export default function App() {
                   Create Task
                 </button>
               </>
-            ) : (
-              <>
-                <p className="text-slate-600 dark:text-slate-300 font-medium mb-1">No matching tasks</p>
-                <p className="text-slate-400 dark:text-slate-500 text-sm">Try a different search or filter</p>
-              </>
             )}
           </div>
         )}
 
-        {/* Task grid */}
-        {!loading && filtered.length > 0 && (
+        {!loading && tasks.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="task-grid">
-            {filtered.map((task) => (
+            {tasks.map((task) => (
               <div key={task.taskId} className="relative">
-                {/* Checkbox */}
                 <div
                   className="absolute top-3 left-3 z-10"
                   onClick={(e) => { e.stopPropagation(); toggleSelect(task.taskId); }}
@@ -486,6 +552,7 @@ export default function App() {
                   <TaskCard
                     task={task}
                     onStart={handleStart}
+                    onReset={handleReset}
                     onUpdate={(id, name, dur, pri, tags, retries, sched) => handleUpdate(id, name, dur, pri, tags, retries, sched)}
                     onDelete={handleDelete}
                     onPurge={showHistory ? handlePurge : undefined}
@@ -497,7 +564,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Pagination */}
         {!loading && (
           <Pagination
             page={page}
@@ -510,7 +576,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Modals & drawers */}
       {showHelp && <KeyboardShortcutsHelp onClose={() => setShowHelp(false)} />}
 
       {showCreate && (
@@ -528,6 +593,7 @@ export default function App() {
           task={detailTask}
           onClose={() => setDetailTask(null)}
           onStart={handleStart}
+          onReset={handleReset}
           onDelete={handleDelete}
           onPurge={showHistory ? handlePurge : undefined}
         />

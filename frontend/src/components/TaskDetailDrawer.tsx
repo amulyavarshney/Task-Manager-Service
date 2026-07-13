@@ -7,6 +7,7 @@ interface Props {
   task: Task;
   onClose: () => void;
   onStart: (id: number) => Promise<void>;
+  onReset?: (id: number) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onPurge?: (id: number) => Promise<void>;
 }
@@ -47,7 +48,7 @@ function ProgressBar({ task }: { task: Task }) {
   );
 }
 
-export function TaskDetailDrawer({ task, onClose, onStart, onDelete, onPurge }: Props) {
+export function TaskDetailDrawer({ task, onClose, onStart, onReset, onDelete, onPurge }: Props) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
@@ -175,6 +176,18 @@ export function TaskDetailDrawer({ task, onClose, onStart, onDelete, onPurge }: 
                 <path d="M8 5v14l11-7z" />
               </svg>
               Run Task
+            </button>
+          )}
+          {!task.deletedAt && (task.taskStatus === 'FAILED' || task.taskStatus === 'DONE') && onReset && (
+            <button
+              onClick={() => onReset(task.taskId)}
+              className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Reset
             </button>
           )}
           {!task.deletedAt && (

@@ -1,4 +1,5 @@
 import type { Task, CreateTaskRequest, UpdateTaskRequest, ExecutorStats, PagedTaskResponse, TaskStats, TaskStatus, TaskPriority, BulkActionResponse } from './types';
+import { demoApi, isDemoMode } from './demoApi';
 
 export interface TaskListParams {
   page?: number;
@@ -20,6 +21,8 @@ export function setApiKey(key: string) {
   if (key) localStorage.setItem(API_KEY_STORAGE, key);
   else localStorage.removeItem(API_KEY_STORAGE);
 }
+
+export { isDemoMode };
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const base = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? '';
@@ -59,7 +62,7 @@ function buildQuery(params?: TaskListParams): string {
   return query ? `?${query}` : '';
 }
 
-export const api = {
+const liveApi = {
   listTasks: (params?: TaskListParams) =>
     request<PagedTaskResponse>(`/api/tasks${buildQuery(params)}`),
   getTask: (id: number) => request<Task>(`/api/tasks/${id}`),
@@ -86,4 +89,28 @@ export const api = {
   getExecutorStats: () => request<ExecutorStats>('/api/executor/stats'),
   getHistory: (params?: TaskListParams) =>
     request<PagedTaskResponse>(`/api/tasks/history${buildQuery(params)}`),
+};
+
+function pickApi() {
+  return isDemoMode() ? demoApi : liveApi;
+}
+
+export const api = {
+  listTasks: (params?: TaskListParams) => pickApi().listTasks(params),
+  getTask: (id: number) => pickApi().getTask(id),
+  getTaskStats: () => pickApi().getTaskStats(),
+  createTask: (body: CreateTaskRequest) => pickApi().createTask(body),
+  updateTask: (id: number, body: UpdateTaskRequest) => pickApi().updateTask(id, body),
+  deleteTask: (id: number) => pickApi().deleteTask(id),
+  purgeTask: (id: number) => pickApi().purgeTask(id),
+  startTask: (id: number) => pickApi().startTask(id),
+  cancelTask: (id: number) => pickApi().cancelTask(id),
+  resetTask: (id: number) => pickApi().resetTask(id),
+  bulkStart: (ids: number[]) => pickApi().bulkStart(ids),
+  bulkDelete: (ids: number[]) => pickApi().bulkDelete(ids),
+  getExecutorStats: () => pickApi().getExecutorStats(),
+  getHistory: (params?: TaskListParams) => pickApi().getHistory(params),
+  resetDemoData: () => {
+    if (isDemoMode()) demoApi.resetDemoData();
+  },
 };

@@ -2,21 +2,28 @@
 
 A Spring Boot REST API + React frontend for creating, managing, and asynchronously executing tasks. Tasks are persisted in PostgreSQL and run on a bounded thread pool; a Vite/React UI lets you manage them in the browser.
 
+## Live demo
+
+**https://amulyavarshney.github.io/Task-Manager-Service/**
+
+The published site runs in **demo mode**: the full task lifecycle (create, edit, run, cancel, reset, bulk actions, history, scheduling, executor stats) works in the browser via `localStorage` — no backend required.
+
 ## Project Structure
 
 ```
 Task-Manager-Service/
 ├── src/                     # Spring Boot backend
 │   └── main/
-│       ├── java/.../config/ # Executor, CORS, metrics
+│       ├── java/.../config/ # Executor, CORS, metrics, security, OpenAPI
 │       └── resources/
 │           ├── application*.properties
 │           └── db/migration/  # Flyway SQL
-├── frontend/                # React + Vite + TypeScript UI
+├── frontend/                # React + Vite + TypeScript UI (demo + live API)
 ├── Dockerfile               # API image
 ├── docker-compose.yml       # Postgres + API + nginx UI
-├── .github/workflows/ci.yml
+├── .github/workflows/       # CI + GitHub Pages deploy
 ├── pom.xml
+├── README.md
 └── .env.example
 ```
 
@@ -87,6 +94,13 @@ npm run dev
 ```
 
 Open `http://localhost:5173` in your browser to use the app.
+
+Demo-only UI (no backend):
+
+```bash
+cd frontend
+VITE_DEMO_MODE=true npm run dev
+```
 
 ## Frontend Features
 
@@ -220,6 +234,26 @@ OpenAPI UI (when API is running): http://localhost:8080/swagger-ui.html
 cd frontend
 npm test          # Vitest unit tests
 npm run test:e2e  # Playwright (API + UI must be running)
+```
+
+## GitHub Pages demo
+
+Pushes to `main` build the frontend with `VITE_DEMO_MODE=true` and deploy via [Deploy GitHub Pages](.github/workflows/deploy-pages.yml).
+
+| Item | Value |
+|------|-------|
+| URL | https://amulyavarshney.github.io/Task-Manager-Service/ |
+| Source | GitHub Actions → Pages |
+| Base path | `/Task-Manager-Service/` |
+
+Enable once: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+Local preview of the published build:
+
+```bash
+cd frontend
+VITE_DEMO_MODE=true VITE_BASE_PATH=/Task-Manager-Service/ npm run build
+npx serve dist -s
 ```
 
 ## License

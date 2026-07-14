@@ -3,7 +3,7 @@ import type { Task, TaskStatus, TaskPriority, ExecutorStats, TaskStats, Toast, S
 import { useDarkMode } from './hooks/useDarkMode';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTemplates } from './hooks/useTemplates';
-import { api, getApiKey, setApiKey } from './api';
+import { api, getApiKey, setApiKey, isDemoMode } from './api';
 import { TaskCard } from './components/TaskCard';
 import { TaskFormModal } from './components/TaskFormModal';
 import { StatsBar } from './components/StatsBar';
@@ -16,6 +16,7 @@ import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 const POLL_INTERVAL_MS = 2000;
 const SEARCH_DEBOUNCE_MS = 300;
 const DEFAULT_DEV_KEY = 'dev-admin-key';
+const DEMO = isDemoMode();
 
 type FilterStatus = 'ALL' | TaskStatus;
 
@@ -71,7 +72,7 @@ export default function App() {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!getApiKey()) setApiKey(DEFAULT_DEV_KEY);
+    if (!DEMO && !getApiKey()) setApiKey(DEFAULT_DEV_KEY);
   }, []);
 
   function toast(type: Toast['type'], message: string) {
@@ -353,16 +354,36 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowApiKey((v) => !v)}
-              title="API key"
-              className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-              </svg>
-            </button>
+            {DEMO && (
+              <button
+                onClick={() => {
+                  if (!confirm('Reset demo data to the sample set?')) return;
+                  api.resetDemoData();
+                  setSelected(new Set());
+                  setPage(0);
+                  fetchTasks({ page: 0 });
+                  fetchTaskStats();
+                  fetchExecutorStats();
+                  toast('info', 'Demo data reset');
+                }}
+                title="Reset demo data"
+                className="hidden sm:inline-flex px-2.5 py-1.5 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+              >
+                Reset demo
+              </button>
+            )}
+            {!DEMO && (
+              <button
+                onClick={() => setShowApiKey((v) => !v)}
+                title="API key"
+                className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+              </button>
+            )}
 
             <button
               onClick={handleToggleHistory}
@@ -435,7 +456,26 @@ export default function App() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 text-slate-800 dark:text-slate-100">
-        {showApiKey && (
+        {DEMO && (
+          <div className="mb-6 rounded-xl border border-sky-200 dark:border-sky-800 bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/40 dark:to-slate-900 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-sky-900 dark:text-sky-200">Live demo mode</p>
+              <p className="text-xs text-sky-800/80 dark:text-sky-300/80 mt-0.5">
+                Full task lifecycle runs in your browser (create, run, cancel, reset, history). Data stays in localStorage — no backend required.
+              </p>
+            </div>
+            <a
+              href="https://github.com/amulyavarshney/Task-Manager-Service"
+              target="_blank"
+              rel="noreferrer"
+              className="shrink-0 text-xs font-medium text-sky-700 dark:text-sky-300 underline hover:no-underline"
+            >
+              View source
+            </a>
+          </div>
+        )}
+
+        {showApiKey && !DEMO && (
           <div className="mb-6 flex flex-col sm:flex-row gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
             <input
               type="password"

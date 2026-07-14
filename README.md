@@ -108,11 +108,25 @@ Open `http://localhost:5173` in your browser to use the app.
 | `GET` | `/api/tasks/{id}` | Get a task | 200 | 404 |
 | `POST` | `/api/tasks` | Create a task | 201 | 400 |
 | `PUT` | `/api/tasks/{id}` | Update task fields (incl. `maxRetries`) | 200 | 400, 404, 409 |
-| `DELETE` | `/api/tasks/{id}` | Soft-delete a task | 204 | 404 |
-| `DELETE` | `/api/tasks/{id}/purge` | Hard-delete a task | 204 | 404 |
-| `POST` | `/api/tasks/{id}/start` | Start async execution | 200 | 404, 409, 503 |
-| `POST` | `/api/tasks/{id}/reset` | Reset FAILED/DONE → READY | 200 | 404, 409 |
-| `GET` | `/api/executor/stats` | Thread pool metrics | 200 | — |
+| `DELETE` | `/api/tasks/{id}` | Soft-delete a task | 204 | 401, 403, 404 |
+| `DELETE` | `/api/tasks/{id}/purge` | Hard-delete a task | 204 | 401, 403, 404 |
+| `POST` | `/api/tasks/{id}/start` | Start async execution | 200 | 401, 403, 404, 409, 503 |
+| `POST` | `/api/tasks/{id}/cancel` | Cancel an `IN_PROGRESS` task | 200 | 401, 403, 404, 409 |
+| `POST` | `/api/tasks/{id}/reset` | Reset FAILED/DONE → READY | 200 | 401, 403, 404, 409 |
+| `POST` | `/api/tasks/bulk/start` | Start many tasks (`{ "ids": [...] }`) | 200 | 401, 403, 400 |
+| `POST` | `/api/tasks/bulk/delete` | Soft-delete many tasks | 200 | 401, 403, 400 |
+| `GET` | `/api/executor/stats` | Thread pool metrics | 200 | 401, 403 |
+
+### Authentication
+
+All `/api/**` routes require header `X-API-Key` when `app.security.enabled=true` (default).
+
+| Key env var | Role | Access |
+|-------------|------|--------|
+| `API_KEY_ADMIN` (default `dev-admin-key`) | ADMIN | Full read/write |
+| `API_KEY_VIEWER` (default `dev-viewer-key`) | VIEWER | GET only |
+
+`/actuator/health` remains public. Other actuator endpoints require ADMIN. Rate limit: `RATE_LIMIT_PER_MINUTE` (default 120) → HTTP 429.
 
 ### Task object
 
@@ -147,8 +161,11 @@ Open `http://localhost:5173` in your browser to use the app.
 | Status | Cause |
 |--------|-------|
 | 400 | Validation failure (blank name, duration bounds, etc.) |
+| 401 | Missing/invalid API key |
+| 403 | Viewer attempted a write |
 | 404 | Task ID not found |
-| 409 | Invalid state (start non-READY, reset non-FAILED/DONE, optimistic lock) |
+| 409 | Invalid state (start non-READY, reset/cancel wrong status, optimistic lock) |
+| 429 | Rate limit exceeded |
 | 503 | Thread pool at capacity |
 
 ## Configuration
@@ -162,6 +179,10 @@ Key properties in `src/main/resources/application.properties`:
 | `spring.datasource.url` | `jdbc:postgresql://localhost:5432/taskmanager` | DB URL |
 | `spring.jpa.hibernate.ddl-auto` | `validate` | Schema owned by Flyway |
 | `app.cors.allowed-origins` | `http://localhost:5173,...` | CORS allow-list (`CORS_ALLOWED_ORIGINS`) |
+| `app.security.enabled` | `true` | Require `X-API-Key` |
+| `app.security.api-keys.admin` | `dev-admin-key` | Admin API key |
+| `app.security.api-keys.viewer` | `dev-viewer-key` | Viewer API key |
+| `app.security.rate-limit-per-minute` | `120` | Per-key/IP request budget |
 | `task.executor.core-pool-size` | `2` | Always-alive threads |
 | `task.executor.max-pool-size` | `4` | Max concurrent task threads |
 | `task.executor.queue-capacity` | `10` | Pending task queue depth |

@@ -1,5 +1,6 @@
 package com.example.taskmanager.config;
 
+import com.example.taskmanager.executor.BoundedPriorityBlockingQueue;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,7 +25,12 @@ public class ExecutorConfig {
 
     @Bean(name = "taskExecutor")
     public ThreadPoolTaskExecutor taskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor() {
+            @Override
+            protected java.util.concurrent.BlockingQueue<Runnable> createQueue(int queueCapacity) {
+                return new BoundedPriorityBlockingQueue(queueCapacity);
+            }
+        };
         executor.setCorePoolSize(corePoolSize);
         executor.setMaxPoolSize(maxPoolSize);
         executor.setQueueCapacity(queueCapacity);

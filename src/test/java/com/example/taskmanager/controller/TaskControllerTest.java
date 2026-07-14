@@ -12,6 +12,7 @@ import com.example.taskmanager.service.TaskService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
@@ -30,6 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TaskController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @Import(GlobalExceptionHandler.class)
 class TaskControllerTest {
 
@@ -213,6 +215,31 @@ class TaskControllerTest {
         mockMvc.perform(post("/api/tasks/1/reset"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.taskStatus").value("READY"));
+    }
+
+    @Test
+    void cancelTask_returns200() throws Exception {
+        when(taskService.cancelTask(1L)).thenReturn(task(1L, "run", 5, TaskStatus.IN_PROGRESS));
+
+        mockMvc.perform(post("/api/tasks/1/cancel"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.taskStatus").value("IN_PROGRESS"));
+    }
+
+    @Test
+    void bulkStart_returns200() throws Exception {
+        com.example.taskmanager.dto.BulkActionResponse response =
+            new com.example.taskmanager.dto.BulkActionResponse();
+        response.addSuccess(1L);
+        response.addFailure(2L, "not ready");
+        when(taskService.bulkStart(any())).thenReturn(response);
+
+        mockMvc.perform(post("/api/tasks/bulk/start")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"ids\":[1,2]}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.succeeded[0]").value(1))
+            .andExpect(jsonPath("$.failed[0].id").value(2));
     }
 
     @Test

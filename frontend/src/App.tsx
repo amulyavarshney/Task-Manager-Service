@@ -3,7 +3,7 @@ import type { Task, TaskStatus, TaskPriority, ExecutorStats, TaskStats, Toast, S
 import { useDarkMode } from './hooks/useDarkMode';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTemplates } from './hooks/useTemplates';
-import { api } from './api';
+import { api, getApiKey, setApiKey } from './api';
 import { TaskCard } from './components/TaskCard';
 import { TaskFormModal } from './components/TaskFormModal';
 import { StatsBar } from './components/StatsBar';
@@ -15,6 +15,7 @@ import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 
 const POLL_INTERVAL_MS = 2000;
 const SEARCH_DEBOUNCE_MS = 300;
+const DEFAULT_DEV_KEY = 'dev-admin-key';
 
 type FilterStatus = 'ALL' | TaskStatus;
 
@@ -64,8 +65,14 @@ export default function App() {
   const { templates, addTemplate, removeTemplate } = useTemplates();
   const [showHelp, setShowHelp] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(() => getApiKey() || DEFAULT_DEV_KEY);
+  const [showApiKey, setShowApiKey] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!getApiKey()) setApiKey(DEFAULT_DEV_KEY);
+  }, []);
 
   function toast(type: Toast['type'], message: string) {
     const id = ++toastSeq;
@@ -277,25 +284,47 @@ export default function App() {
     fetchTaskStats();
   }
 
+  async function handleCancel(id: number) {
+    const updated = await api.cancelTask(id);
+    setTasks((prev) => prev.map((t) => (t.taskId === id ? updated : t)));
+    setDetailTask((prev) => prev?.taskId === id ? updated : prev);
+    toast('info', `Cancel requested for "${updated.taskName}"`);
+    fetchTaskStats();
+  }
+
   async function handleBulkStart() {
-    const ready = tasks.filter((t) => selected.has(t.taskId) && t.taskStatus === 'READY');
-    let ok = 0;
-    for (const t of ready) {
-      try { await handleStart(t.taskId); ok++; } catch { /* individual errors shown on card */ }
+    const readyIds = tasks.filter((t) => selected.has(t.taskId) && t.taskStatus === 'READY').map((t) => t.taskId);
+    if (readyIds.length === 0) return;
+    try {
+      const result = await api.bulkStart(readyIds);
+      await Promise.all([fetchTasks(), fetchTaskStats(), fetchExecutorStats()]);
+      toast('success', `Started ${result.succeeded.length} task${result.succeeded.length === 1 ? '' : 's'}`
+        + (result.failed.length ? ` (${result.failed.length} failed)` : ''));
+    } catch (err) {
+      toast('error', err instanceof Error ? err.message : 'Bulk start failed');
     }
-    if (ok > 0) toast('success', `Started ${ok} task${ok > 1 ? 's' : ''}`);
   }
 
   async function handleBulkDelete() {
     if (!confirm(`Delete ${selected.size} selected task(s)?`)) return;
-    let ok = 0;
-    for (const id of selected) {
-      try { await api.deleteTask(id); ok++; } catch { /* skip */ }
+    try {
+      const result = await api.bulkDelete([...selected]);
+      setSelected(new Set());
+      setPage(0);
+      await Promise.all([fetchTasks({ page: 0 }), fetchTaskStats()]);
+      toast('info', `Deleted ${result.succeeded.length} task${result.succeeded.length === 1 ? '' : 's'}`);
+    } catch (err) {
+      toast('error', err instanceof Error ? err.message : 'Bulk delete failed');
     }
-    setSelected(new Set());
-    await Promise.all([fetchTasks({ page: 0 }), fetchTaskStats()]);
-    setPage(0);
-    toast('info', `Deleted ${ok} task${ok > 1 ? 's' : ''}`);
+  }
+
+  function saveApiKey() {
+    setApiKey(apiKeyInput.trim());
+    setShowApiKey(false);
+    toast('success', 'API key saved');
+    fetchTasks();
+    fetchExecutorStats();
+    fetchTaskStats();
   }
 
   function toggleSelect(id: number) {
@@ -324,6 +353,17 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowApiKey((v) => !v)}
+              title="API key"
+              className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+            </button>
+
             <button
               onClick={handleToggleHistory}
               title={showHistory ? 'Back to active tasks' : 'View deleted task history'}
@@ -395,6 +435,24 @@ export default function App() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 text-slate-800 dark:text-slate-100">
+        {showApiKey && (
+          <div className="mb-6 flex flex-col sm:flex-row gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+            <input
+              type="password"
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              placeholder="X-API-Key (dev-admin-key / dev-viewer-key)"
+              className="flex-1 border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900"
+            />
+            <button
+              onClick={saveApiKey}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+            >
+              Save key
+            </button>
+          </div>
+        )}
+
         {showHistory && (
           <div className="mb-6 flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-300 text-sm rounded-lg px-4 py-3">
             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -552,6 +610,7 @@ export default function App() {
                   <TaskCard
                     task={task}
                     onStart={handleStart}
+                    onCancel={handleCancel}
                     onReset={handleReset}
                     onUpdate={(id, name, dur, pri, tags, retries, sched) => handleUpdate(id, name, dur, pri, tags, retries, sched)}
                     onDelete={handleDelete}
@@ -593,6 +652,7 @@ export default function App() {
           task={detailTask}
           onClose={() => setDetailTask(null)}
           onStart={handleStart}
+          onCancel={handleCancel}
           onReset={handleReset}
           onDelete={handleDelete}
           onPurge={showHistory ? handlePurge : undefined}

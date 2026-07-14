@@ -1,5 +1,7 @@
 package com.example.taskmanager.controller;
 
+import com.example.taskmanager.dto.BulkActionResponse;
+import com.example.taskmanager.dto.BulkIdsRequest;
 import com.example.taskmanager.dto.CreateTaskRequest;
 import com.example.taskmanager.dto.PagedTaskResponse;
 import com.example.taskmanager.dto.TaskResponse;
@@ -52,6 +54,16 @@ public class TaskController {
         return ResponseEntity.ok(taskService.getTaskHistory(pageable, status, priority, search, tag));
     }
 
+    @PostMapping("/tasks/bulk/start")
+    public ResponseEntity<BulkActionResponse> bulkStart(@Valid @RequestBody BulkIdsRequest request) {
+        return ResponseEntity.ok(taskService.bulkStart(request.getIds()));
+    }
+
+    @PostMapping("/tasks/bulk/delete")
+    public ResponseEntity<BulkActionResponse> bulkDelete(@Valid @RequestBody BulkIdsRequest request) {
+        return ResponseEntity.ok(taskService.bulkDelete(request.getIds()));
+    }
+
     @GetMapping("/tasks/{id}")
     public ResponseEntity<TaskResponse> getTask(@PathVariable Long id) {
         return ResponseEntity.ok(TaskResponse.from(taskService.getTaskById(id)));
@@ -80,6 +92,11 @@ public class TaskController {
     @PostMapping("/tasks/{id}/start")
     public ResponseEntity<TaskResponse> startTask(@PathVariable Long id) {
         return ResponseEntity.ok(TaskResponse.from(taskService.startTask(id)));
+    }
+
+    @PostMapping("/tasks/{id}/cancel")
+    public ResponseEntity<TaskResponse> cancelTask(@PathVariable Long id) {
+        return ResponseEntity.ok(TaskResponse.from(taskService.cancelTask(id)));
     }
 
     @PostMapping("/tasks/{id}/reset")

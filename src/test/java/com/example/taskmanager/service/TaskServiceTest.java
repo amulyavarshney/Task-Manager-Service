@@ -150,6 +150,42 @@ class TaskServiceTest {
             .isInstanceOf(com.example.taskmanager.exception.TaskInvalidStateException.class);
     }
 
+    @Test
+    void cancelTask_interruptsRunningTask() {
+        Task task = taskWithId(1L, "run", 5, TaskStatus.IN_PROGRESS);
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(task));
+        when(taskRunner.cancel(1L)).thenReturn(true);
+
+        Task result = taskService.cancelTask(1L);
+
+        assertThat(result.getTaskStatus()).isEqualTo(TaskStatus.IN_PROGRESS);
+        verify(taskRunner).cancel(1L);
+    }
+
+    @Test
+    void cancelTask_throws_whenNotInProgress() {
+        Task task = taskWithId(1L, "ready", 5, TaskStatus.READY);
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(task));
+
+        assertThatThrownBy(() -> taskService.cancelTask(1L))
+            .isInstanceOf(com.example.taskmanager.exception.TaskInvalidStateException.class);
+    }
+
+    @Test
+    void bulkStart_collectsSuccessAndFailures() {
+        Task ready = taskWithId(1L, "a", 5, TaskStatus.READY);
+        Task done = taskWithId(2L, "b", 5, TaskStatus.DONE);
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(ready));
+        when(taskRepository.findByTaskIdAndDeletedAtIsNull(2L)).thenReturn(Optional.of(done));
+        when(taskRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = taskService.bulkStart(List.of(1L, 2L));
+
+        assertThat(result.getSucceeded()).containsExactly(1L);
+        assertThat(result.getFailed()).hasSize(1);
+        assertThat(result.getFailed().get(0).id()).isEqualTo(2L);
+    }
+
     // ── getTaskStats ──────────────────────────────────────────────────────────
 
     @Test

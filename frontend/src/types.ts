@@ -51,6 +51,11 @@ export interface TaskStats {
   byStatus: Record<TaskStatus, number>;
 }
 
+export interface BulkActionResponse {
+  succeeded: number[];
+  failed: { id: number; reason: string }[];
+}
+
 export interface Toast {
   id: number;
   type: 'success' | 'error' | 'info';

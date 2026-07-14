@@ -7,6 +7,7 @@ interface Props {
   task: Task;
   onClose: () => void;
   onStart: (id: number) => Promise<void>;
+  onCancel?: (id: number) => Promise<void>;
   onReset?: (id: number) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onPurge?: (id: number) => Promise<void>;
@@ -48,7 +49,7 @@ function ProgressBar({ task }: { task: Task }) {
   );
 }
 
-export function TaskDetailDrawer({ task, onClose, onStart, onReset, onDelete, onPurge }: Props) {
+export function TaskDetailDrawer({ task, onClose, onStart, onCancel, onReset, onDelete, onPurge }: Props) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
@@ -176,6 +177,14 @@ export function TaskDetailDrawer({ task, onClose, onStart, onReset, onDelete, on
                 <path d="M8 5v14l11-7z" />
               </svg>
               Run Task
+            </button>
+          )}
+          {!task.deletedAt && task.taskStatus === 'IN_PROGRESS' && onCancel && (
+            <button
+              onClick={() => onCancel(task.taskId)}
+              className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Cancel
             </button>
           )}
           {!task.deletedAt && (task.taskStatus === 'FAILED' || task.taskStatus === 'DONE') && onReset && (

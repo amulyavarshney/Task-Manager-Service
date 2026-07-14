@@ -1,4 +1,4 @@
-import type { Task, CreateTaskRequest, UpdateTaskRequest, ExecutorStats, PagedTaskResponse, TaskStats, TaskStatus, TaskPriority } from './types';
+import type { Task, CreateTaskRequest, UpdateTaskRequest, ExecutorStats, PagedTaskResponse, TaskStats, TaskStatus, TaskPriority, BulkActionResponse } from './types';
 
 export interface TaskListParams {
   page?: number;
@@ -10,11 +10,29 @@ export interface TaskListParams {
   tag?: string;
 }
 
+const API_KEY_STORAGE = 'taskmanager.apiKey';
+
+export function getApiKey(): string {
+  return localStorage.getItem(API_KEY_STORAGE) ?? (import.meta.env.VITE_API_KEY as string | undefined) ?? '';
+}
+
+export function setApiKey(key: string) {
+  if (key) localStorage.setItem(API_KEY_STORAGE, key);
+  else localStorage.removeItem(API_KEY_STORAGE);
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const base = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? '';
+  const apiKey = getApiKey();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options?.headers as Record<string, string> | undefined),
+  };
+  if (apiKey) headers['X-API-Key'] = apiKey;
+
   const res = await fetch(`${base}${url}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers,
   });
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
@@ -53,7 +71,18 @@ export const api = {
   deleteTask: (id: number) => request<void>(`/api/tasks/${id}`, { method: 'DELETE' }),
   purgeTask: (id: number) => request<void>(`/api/tasks/${id}/purge`, { method: 'DELETE' }),
   startTask: (id: number) => request<Task>(`/api/tasks/${id}/start`, { method: 'POST' }),
+  cancelTask: (id: number) => request<Task>(`/api/tasks/${id}/cancel`, { method: 'POST' }),
   resetTask: (id: number) => request<Task>(`/api/tasks/${id}/reset`, { method: 'POST' }),
+  bulkStart: (ids: number[]) =>
+    request<BulkActionResponse>('/api/tasks/bulk/start', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
+  bulkDelete: (ids: number[]) =>
+    request<BulkActionResponse>('/api/tasks/bulk/delete', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
   getExecutorStats: () => request<ExecutorStats>('/api/executor/stats'),
   getHistory: (params?: TaskListParams) =>
     request<PagedTaskResponse>(`/api/tasks/history${buildQuery(params)}`),

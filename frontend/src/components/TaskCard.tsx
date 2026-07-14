@@ -7,6 +7,7 @@ import { TaskFormModal } from './TaskFormModal';
 interface Props {
   task: Task;
   onStart: (id: number) => Promise<void>;
+  onCancel?: (id: number) => Promise<void>;
   onReset?: (id: number) => Promise<void>;
   onUpdate: (id: number, name: string, duration: number, priority: Task['priority'], tags: string[], maxRetries: number, scheduledAt: string | null) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
@@ -46,10 +47,11 @@ function ProgressBar({ task }: { task: Task }) {
   );
 }
 
-export function TaskCard({ task, onStart, onReset, onUpdate, onDelete, onPurge, onViewDetail }: Props) {
+export function TaskCard({ task, onStart, onCancel, onReset, onUpdate, onDelete, onPurge, onViewDetail }: Props) {
   const [editing, setEditing] = useState(false);
   const [actionError, setActionError] = useState('');
   const [starting, setStarting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [purging, setPurging] = useState(false);
@@ -57,6 +59,7 @@ export function TaskCard({ task, onStart, onReset, onUpdate, onDelete, onPurge, 
   const isDeleted = !!task.deletedAt;
   const canEdit = task.taskStatus === 'READY' && !isDeleted;
   const canStart = task.taskStatus === 'READY' && !isDeleted;
+  const canCancel = task.taskStatus === 'IN_PROGRESS' && !isDeleted && !!onCancel;
   const canReset = (task.taskStatus === 'FAILED' || task.taskStatus === 'DONE') && !isDeleted && !!onReset;
 
   async function handleStart(e: React.MouseEvent) {
@@ -82,6 +85,19 @@ export function TaskCard({ task, onStart, onReset, onUpdate, onDelete, onPurge, 
       setActionError(err instanceof Error ? err.message : 'Failed to reset task');
     } finally {
       setResetting(false);
+    }
+  }
+
+  async function handleCancel(e: React.MouseEvent) {
+    e.stopPropagation();
+    setCancelling(true);
+    setActionError('');
+    try {
+      await onCancel!(task.taskId);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to cancel task');
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -202,6 +218,16 @@ export function TaskCard({ task, onStart, onReset, onUpdate, onDelete, onPurge, 
                   Run
                 </>
               )}
+            </button>
+          )}
+
+          {canCancel && (
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {cancelling ? 'Cancelling…' : 'Cancel'}
             </button>
           )}
 

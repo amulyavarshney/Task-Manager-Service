@@ -1,5 +1,6 @@
 package com.example.taskmanager.service;
 
+import com.example.taskmanager.dto.BulkActionResponse;
 import com.example.taskmanager.dto.CreateTaskRequest;
 import com.example.taskmanager.dto.PagedTaskResponse;
 import com.example.taskmanager.dto.TaskStatsResponse;
@@ -9,6 +10,7 @@ import com.example.taskmanager.entity.TaskStatus;
 import com.example.taskmanager.exception.TaskAlreadyRunningException;
 import com.example.taskmanager.exception.TaskInvalidStateException;
 import com.example.taskmanager.exception.TaskNotFoundException;
+import com.example.taskmanager.executor.PrioritizedTask;
 import com.example.taskmanager.repository.TaskRepository;
 import com.example.taskmanager.repository.TaskSpecifications;
 import org.slf4j.Logger;
@@ -158,8 +160,12 @@ public class TaskService {
         taskRepository.flush();
 
         int durationSeconds = task.getTaskDuration();
+        TaskPriority priority = task.getPriority();
         try {
-            taskExecutor.execute(() -> taskRunner.run(id, durationSeconds));
+            taskExecutor.execute(new PrioritizedTask(
+                    priority,
+                    () -> taskRunner.run(id, durationSeconds, priority)
+            ));
         } catch (RejectedExecutionException e) {
             task.setTaskStatus(TaskStatus.READY);
             task.setStartedAt(null);
@@ -167,6 +173,27 @@ public class TaskService {
             throw e;
         }
 
+        return task;
+    }
+
+    @Transactional
+    public Task cancelTask(Long id) {
+        Task task = getTaskById(id);
+        if (task.getTaskStatus() != TaskStatus.IN_PROGRESS) {
+            throw new TaskInvalidStateException(
+                    "Task " + id + " must be IN_PROGRESS to cancel (current: " + task.getTaskStatus() + ")");
+        }
+        boolean interrupted = taskRunner.cancel(id);
+        if (!interrupted && !taskRunner.isRunning(id)) {
+            // Race: finished between status check and cancel — reload
+            task = getTaskById(id);
+            if (task.getTaskStatus() == TaskStatus.IN_PROGRESS) {
+                task.setTaskStatus(TaskStatus.FAILED);
+                task.setCompletedAt(Instant.now());
+                task.setResultMessage("Cancelled by user");
+                return taskRepository.save(task);
+            }
+        }
         return task;
     }
 
@@ -185,11 +212,41 @@ public class TaskService {
         return taskRepository.save(task);
     }
 
+    public BulkActionResponse bulkStart(List<Long> ids) {
+        BulkActionResponse response = new BulkActionResponse();
+        for (Long id : ids) {
+            try {
+                startTask(id);
+                response.addSuccess(id);
+            } catch (Exception e) {
+                response.addFailure(id, e.getMessage());
+            }
+        }
+        return response;
+    }
+
+    public BulkActionResponse bulkDelete(List<Long> ids) {
+        BulkActionResponse response = new BulkActionResponse();
+        for (Long id : ids) {
+            try {
+                deleteTask(id);
+                response.addSuccess(id);
+            } catch (Exception e) {
+                response.addFailure(id, e.getMessage());
+            }
+        }
+        return response;
+    }
+
     public void startScheduledTasks() {
         List<Task> due = taskRepository
                 .findByTaskStatusAndScheduledAtIsNotNullAndScheduledAtLessThanEqual(
                         TaskStatus.READY, Instant.now())
                 .stream().filter(t -> t.getDeletedAt() == null).toList();
+        // Prefer higher priority when auto-starting due work
+        due = due.stream()
+                .sorted((a, b) -> Integer.compare(priorityRank(b.getPriority()), priorityRank(a.getPriority())))
+                .toList();
         for (Task task : due) {
             try {
                 startTask(task.getTaskId());
@@ -198,6 +255,17 @@ public class TaskService {
                 log.warn("Failed to auto-start scheduled task {}: {}", task.getTaskId(), e.getMessage());
             }
         }
+    }
+
+    private static int priorityRank(TaskPriority priority) {
+        if (priority == null) {
+            return 1;
+        }
+        return switch (priority) {
+            case HIGH -> 2;
+            case MEDIUM -> 1;
+            case LOW -> 0;
+        };
     }
 
     public Map<String, Object> getExecutorStats() {

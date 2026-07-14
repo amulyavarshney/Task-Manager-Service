@@ -38,6 +38,8 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
         }
         String path = request.getRequestURI();
         return path.startsWith("/actuator/health")
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs")
                 || "OPTIONS".equalsIgnoreCase(request.getMethod());
     }
 

@@ -196,21 +196,31 @@ Key properties in `src/main/resources/application.properties`:
 | `/actuator/health/liveness` | Liveness probe |
 | `/actuator/health/readiness` | Readiness probe |
 | `/actuator/metrics` | Micrometer metrics (incl. `taskmanager.executor.*`) |
+| `/swagger-ui.html` | Interactive OpenAPI docs |
 
 Profiles: `dev` (SQL logging), `prod` (structured JSON logs, stricter health).
 
 ## Testing
 
+### Backend
+
 ```bash
 mvn test
+# Optional PostgreSQL integration (requires Docker):
+RUN_TESTCONTAINERS=true mvn -Dtest=TaskIntegrationTest test
 ```
 
-Tests run against an H2 in-memory database (no PostgreSQL needed). Coverage includes:
+Unit/slice tests use H2. Coverage includes service, controller, runner, and API-key security tests.
 
-- `TaskServiceTest` — unit tests for service methods (create, update, reset, stats, start)
-- `TaskControllerTest` — MockMvc slice tests for endpoints and filters
-- `TaskRunnerTest` — async completion, interruption, and retry behavior
-- `TaskManagerApplicationTests` — Spring context smoke test
+OpenAPI UI (when API is running): http://localhost:8080/swagger-ui.html
+
+### Frontend
+
+```bash
+cd frontend
+npm test          # Vitest unit tests
+npm run test:e2e  # Playwright (API + UI must be running)
+```
 
 ## License
 

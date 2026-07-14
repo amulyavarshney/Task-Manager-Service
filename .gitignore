@@ -50,5 +50,9 @@ logs/
 application-local.properties
 application-secrets.properties
 
-# ── Playwright (test artifacts) ──────────────────────────────────────────────
+# ── Playwright ───────────────────────────────────────────────────────────────
 .playwright-mcp/
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/playwright/.cache/
